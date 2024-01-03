@@ -1,0 +1,51 @@
+{{define "main_pricemng"}}
+
+    
+    
+<div class="tbl-box">
+    <!--for demo wrap-->
+    <div class="tbl-header">
+      <table cellpadding="0" cellspacing="0" border="0">
+        <thead>
+          <tr>
+            <th>가격ID</th>
+            <th>갱신시간</th>
+            <th>가격</th>
+          </tr>
+        </thead>
+      </table>
+    </div>
+    <div class="tbl-content">
+      <table cellpadding="0" cellspacing="0" border="0">
+        <tbody>
+          {{range .Items}}
+          <tr>
+            <td>{{.Id}}</td>
+            <td>{{.Price}}</td>
+            <td>{{.Time}}</td>
+          </tr>
+          {{end}}
+          
+          
+        </tbody>
+      </table>
+    </div>
+  </div>
+    
+
+  <div class="price-input">
+    <form id="form-price">
+      <input type="text"/>
+      <input type="submit">
+    </form>
+  </div>
+    
+
+</body>
+<link rel="stylesheet" href="css/main_pricelist.css" />
+<script src="js/main_pricelist.js" defer></script>
+
+
+</html>
+
+{{end}}

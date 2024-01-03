@@ -1,0 +1,50 @@
+{{define "main_admng"}}
+
+
+    
+<div class="tbl-box">
+    <!--for demo wrap-->
+    <div class="tbl-header">
+      <table cellpadding="0" cellspacing="0" border="0">
+        <thead>
+          <tr>
+            <th>기기ID</th>
+            <th>광고파일</th>
+            <th>배정시간</th>
+          </tr>
+        </thead>
+      </table>
+    </div>
+    <div class="tbl-content">
+      <table cellpadding="0" cellspacing="0" border="0">
+        <tbody>
+          {{range .Items}}
+          <tr>
+            <td>{{.D_Id}}</td>
+            <td>{{.AD_Id}}</td>
+            <td>{{.Time}}</td>
+          </tr>
+          {{end}}
+          
+        </tbody>
+      </table>
+    </div>
+  </div>
+    
+  <div class="ad-input">
+    <form id="form-ad">
+      <input type="file" accept="image/*,video/*" multiple required onchange='aaa'/>
+      <input type="submit">
+    </form>
+  </div>
+  <div class="ad-input-list">
+  </div>
+
+</body>
+<link rel="stylesheet" href="css/main_admng.css" />
+<script src="js/main_admng.js" defer></script>
+
+
+</html>
+
+{{end}}

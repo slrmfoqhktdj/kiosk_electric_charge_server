@@ -9,11 +9,9 @@ import (
 	"os"
 
 	_ "github.com/go-sql-driver/mysql"
-)
 
-type ST_GetVersion struct {
-	Version string
-}
+	"kiosk_electoric_charge/gosrc/structs"
+)
 
 //업데이트 완료
 func set_update_version(id string, version string) {
@@ -79,7 +77,7 @@ func Get_apk_version_Handler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Get_apk_version")
 
-	data, _ := json.Marshal(ST_GetVersion{get_version_DB()})
+	data, _ := json.Marshal(structs.ST_GetVersion{Version: get_version_DB()})
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

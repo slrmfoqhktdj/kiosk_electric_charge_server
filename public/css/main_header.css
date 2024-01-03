@@ -1,0 +1,96 @@
+html,body{
+  margin: 20px 0 0 0;
+  text-align: center;
+  height: 100%;
+  width: 100%;
+  font:600 16px/18px 'Open Sans',sans-serif;
+}
+
+.left_menu_box {
+  width: 10%;
+  height: 90%;
+  background: rgb(68, 68, 70);
+  margin-left: 0.5%;
+  overflow: auto;
+  position: fixed;
+}
+
+.left_menu_box ul ol p{
+  margin: 0px ;
+  font-size: 12px;
+  display: flex;
+  align-items: flex-start;
+  color: rgba(255, 255, 255, 0.514);
+}
+
+.page_title {
+    width: 100%;
+    height: 10%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.page_contents {
+    width: 100%;
+    height: 90%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+ul {
+  height: 100%;
+  list-style-type: none; 
+  padding: 0px;
+  margin: 0px;
+  display: flex;
+  justify-content: space-evenly;
+  flex-direction: column;
+}
+
+ol{
+  list-style-type: none; 
+  padding: 0px;
+  margin: 0px;
+  display: flex;
+  justify-content: space-evenly;
+  flex-direction: column;
+}
+  
+  li a,li div {
+    text-decoration: none;
+    padding: 10px;
+    display: block;
+    color: rgba(255, 255, 255, 0.514);
+    font-weight: bold;
+    text-align: center;
+  }
+  
+  li a:hover,li div:hover {
+    background: rgb(68, 68, 70);
+    color: #fff;
+  }
+
+  li div{
+    cursor : pointer;
+  }
+  
+  .cd1 {
+    width: 88%;
+    height: 90%;
+    margin-left: 11%;
+    margin-right: 1%;
+    text-align: center;
+    background: rgb(255, 255, 255);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+  }
+
+  .cd1 h3 {
+    color :rgb(214, 213, 213) 
+  }
+

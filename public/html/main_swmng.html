@@ -1,0 +1,49 @@
+{{define "main_swmng"}}
+
+    
+    
+<div class="tbl-box">
+    <!--for demo wrap-->
+    <div class="tbl-header">
+      <table cellpadding="0" cellspacing="0" border="0">
+        <thead>
+          <tr>
+            <th>Version ID</th>
+            <th>버전번호</th>
+            <th>갱신시간</th>
+          </tr>
+        </thead>
+      </table>
+    </div>
+    <div class="tbl-content">
+      <table cellpadding="0" cellspacing="0" border="0">
+        <tbody>
+          {{range .Items}}
+          <tr>
+            <td>{{.Id}}</td>
+            <td>{{.Version}}</td>
+            <td>{{.Time}}</td>
+          </tr>
+          {{end}}
+         
+          
+        </tbody>
+      </table>
+    </div>
+  </div>
+    
+  <div class="sw-input">
+    <form id="form-sw">
+      <input type="file" accept=".apk,.APK" multiple required />
+      <input type="submit">
+    </form>
+  </div>
+
+</body>
+<link rel="stylesheet" href="css/main_swmng.css" />
+<script src="js/main_swmng.js" defer></script>
+
+
+</html>
+
+{{end}}
