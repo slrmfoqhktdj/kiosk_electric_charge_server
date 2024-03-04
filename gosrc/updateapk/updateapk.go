@@ -13,7 +13,7 @@ import (
 	"kiosk_electoric_charge/gosrc/structs"
 )
 
-//업데이트 완료
+// 업데이트 완료
 func set_update_version(id string, version string) {
 	dbname := os.Getenv("DBNAME")
 	dbdata := os.Getenv("DBDATA")
@@ -36,7 +36,7 @@ func set_update_version(id string, version string) {
 
 }
 
-//버전 반환 db
+// 버전 반환 db
 func get_version_DB() string {
 	dbname := os.Getenv("DBNAME")
 	dbdata := os.Getenv("DBDATA")
@@ -63,7 +63,7 @@ func get_version_DB() string {
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-//앱 apk 파일 다운
+// 앱 apk 파일 다운
 func App_apk_download_Handler(w http.ResponseWriter, r *http.Request) {
 
 	a_id := r.PostFormValue("device_id")
@@ -72,7 +72,16 @@ func App_apk_download_Handler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "./apkmanager/kiosk_electric_charger.zip")
 }
 
-//버전 확인
+// 앱 apk 파일 다운
+func App_pole_apk_download_Handler(w http.ResponseWriter, r *http.Request) {
+
+	a_id := r.PostFormValue("device_id")
+	log.Printf("App_apk_download %s", a_id)
+
+	http.ServeFile(w, r, "./apkmanager/kiosk_electric_charger_pole.zip")
+}
+
+// 버전 확인
 func Get_apk_version_Handler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Get_apk_version")
@@ -84,7 +93,7 @@ func Get_apk_version_Handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, string(data))
 }
 
-//앱 업데이트 완료
+// 앱 업데이트 완료
 func App_update_complete_Handler(w http.ResponseWriter, r *http.Request) {
 
 	a_id := r.PostFormValue("d_id")

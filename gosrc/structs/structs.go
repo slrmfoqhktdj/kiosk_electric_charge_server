@@ -144,3 +144,11 @@ type PayItem struct {
 	Credit_Num string `json:"Credit_Num"`
 	Pay_Day    string `json:"Pay_Day"`
 }
+
+// can_pay string, c_pay_day string, c_c_num string, pay_num string
+type CanclePayItem struct {
+	Pay_Num    string `json:"Pay_Num"`
+	Cancle_Pay string `json:"Cancle_Pay"`
+	C_Pay_Day  string `json:"C_Pay_Day"`
+	C_C_Num    string `json:"C_C_Num"`
+}

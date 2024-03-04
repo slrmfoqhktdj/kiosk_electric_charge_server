@@ -12,52 +12,60 @@ import (
 // 장치 상태 1 정상 , -1 에러,  2 충전중 , 3 연결끊김
 
 // 기기 부팅
-func BootNotification_update(device_name string, device_state string, device_sw_v string) bool {
+func BootNotification_db_handler(device_name string, device_sw_v string) string {
 	dbname := os.Getenv("DBNAME")
 	dbdata := os.Getenv("DBDATA")
+
+	var enabled_row string
 
 	conn, err := sql.Open(dbname, dbdata)
 	if err != nil {
 		fmt.Println(err)
-		return false
+		return "2"
 	}
 
-	rows, err := conn.Query("UPDATE device SET state = ? ,s_version = ? WHERE id = ?", device_state, device_sw_v, device_name)
+	err = conn.QueryRow("SELECT enabled FROM device WHERE id = ?", device_name).Scan(&enabled_row)
+	if err != nil {
+		fmt.Printf("srows1 : %s", err)
+		return "2"
+	}
+
+	rows, err := conn.Query("UPDATE device SET s_version = ? WHERE id = ?", device_sw_v, device_name)
 	if err != nil {
 		fmt.Printf("rows1 : %s", err)
-		return false
+		return "2"
 	}
 
-	log.Printf("BootNotification_update : %v", rows)
+	log.Printf("BootNotification_db_handler : %s , %v", enabled_row, rows)
 
 	defer conn.Close()
 
-	return true
+	return enabled_row
 }
 
-// 기기 상태 업데이트
-func Websocket_connector_update(device_name string, device_state string) bool {
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
+// 기기 상태 업데이트	--- 에러,충전중,정상 써야할듯. 연결, 비연결은 관리자페이지에서 불러올때 main.go에서 csms에 있는 connector 모음집에서 꺼내와 확인해야할듯
+// func Websocket_connector_update(device_name string, device_state string) bool {
+// 	dbname := os.Getenv("DBNAME")
+// 	dbdata := os.Getenv("DBDATA")
 
-	conn, err := sql.Open(dbname, dbdata)
-	if err != nil {
-		fmt.Println(err)
-		return false
-	}
+// 	conn, err := sql.Open(dbname, dbdata)
+// 	if err != nil {
+// 		fmt.Println(err)
+// 		return false
+// 	}
 
-	rows, err := conn.Query("UPDATE device SET state = ?  WHERE id = ?", device_state, device_name)
-	if err != nil {
-		fmt.Printf("rows1 : %s", err)
-		return false
-	}
+// 	rows, err := conn.Query("UPDATE device SET state = ?  WHERE id = ?", device_state, device_name)
+// 	if err != nil {
+// 		fmt.Printf("rows1 : %s", err)
+// 		return false
+// 	}
 
-	log.Printf("Websocket_connector_update : %v", rows)
+// 	log.Printf("Websocket_connector_update : %v", rows)
 
-	defer conn.Close()
+// 	defer conn.Close()
 
-	return true
-}
+// 	return true
+// }
 
 // 결제정보 insert
 func DataTransfer_set_pay(device_id string, charge_Pay string, pay_By string, credit_num string, pay_num string, pay_day string) bool {
@@ -77,6 +85,30 @@ func DataTransfer_set_pay(device_id string, charge_Pay string, pay_By string, cr
 	}
 
 	log.Printf("DataTransfer_set_pay : %v", rows)
+
+	defer conn.Close()
+
+	return true
+}
+
+// 결제정보 부분취소 update
+func DataTransfer_update_pay(can_pay string, c_pay_day string, c_c_num string, pay_num string) bool {
+	dbname := os.Getenv("DBNAME")
+	dbdata := os.Getenv("DBDATA")
+
+	conn, err := sql.Open(dbname, dbdata)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+
+	rows, err := conn.Query("UPDATE pay_h SET can_pay = ? , c_pay_day = ? , c_c_num = ? WHERE pay_num = ?) VALUES(?,?,?,?)", can_pay, c_pay_day, c_c_num, pay_num)
+	if err != nil {
+		fmt.Printf("rows1 : %s", err)
+		return false
+	}
+
+	log.Printf("DataTransfer_update_pay : %v", rows)
 
 	defer conn.Close()
 
@@ -111,7 +143,7 @@ func Authorize_select_payuser(pay_num string) bool {
 }
 
 // 충전정보 insert
-func StartTransaction_set_start(c_id string, c_conn int, c_amount int, Timestamp string) bool {
+func StartTransaction_set_start(c_id string, c_conn int, c_amount float32, Timestamp string) bool {
 
 	dbname := os.Getenv("DBNAME")
 	dbdata := os.Getenv("DBDATA")
@@ -136,7 +168,7 @@ func StartTransaction_set_start(c_id string, c_conn int, c_amount int, Timestamp
 }
 
 // 충전정보 update
-func StopTransaction_update_end(id string, c_time_e string, c_amount int) bool {
+func StopTransaction_update_end(id string, c_time_e string, c_amount float32) bool {
 
 	dbname := os.Getenv("DBNAME")
 	dbdata := os.Getenv("DBDATA")
@@ -160,8 +192,7 @@ func StopTransaction_update_end(id string, c_time_e string, c_amount int) bool {
 	return true
 }
 
-// 충전기 커넥터 상태 update
-func StatusNotification_connector(id string, ConnectorId int, state string, errcode string) {
+func StatusNotification_update(id string, ConnectorId int, errcode string, status string, vendorid string, vendorerrorcode string, info string, timestemp string) {
 
 	dbname := os.Getenv("DBNAME")
 	dbdata := os.Getenv("DBDATA")
@@ -171,45 +202,23 @@ func StatusNotification_connector(id string, ConnectorId int, state string, errc
 		fmt.Println(err)
 	}
 
-	if ConnectorId == 1 {
-		rows, err := conn.Query("UPDATE device SET l_state = ? WHERE id = ?", state, id)
+	if vendorid > "" {
+		rows, err := conn.Query("UPDATE device_status SET state = ? , state_e = ?, v_id = ?, v_error = ? , e_info = ? , u_time = ? WHERE id = ?", status, errcode, vendorid, vendorerrorcode, info, timestemp, id)
 		if err != nil {
 			fmt.Printf("rows1 : %s", err)
 		}
+		log.Printf("StatusNotification_update vendor false : %v", rows)
 
-		log.Printf("StatusNotification_connector left : %v", rows)
-	} else if ConnectorId == 2 {
-		rows, err := conn.Query("UPDATE device SET r_state = ? WHERE id = ?", state, id)
+	} else {
+		rows, err := conn.Query("UPDATE device_status SET state = ? , state_e = ?, e_info = ? , u_time = ?  WHERE id = ?", status, errcode, info, timestemp, id)
 		if err != nil {
 			fmt.Printf("rows1 : %s", err)
 		}
-
-		log.Printf("StatusNotification_connector right : %v", rows)
+		log.Printf("StatusNotification_update vendor true : %v", rows)
 	}
 
 	defer conn.Close()
 
-}
-
-// 충전기 상태 update
-func StatusNotification_device(id string, state string, errcode string) {
-
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
-
-	conn, err := sql.Open(dbname, dbdata)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	rows, err := conn.Query("UPDATE device SET state = ? WHERE id = ?", id, state)
-	if err != nil {
-		fmt.Printf("rows1 : %s", err)
-	}
-
-	log.Printf("StatusNotification_device : %v", rows)
-
-	defer conn.Close()
 }
 
 // 충전량 update

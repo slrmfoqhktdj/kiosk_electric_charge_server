@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
@@ -192,7 +193,7 @@ var logd *zap.SugaredLogger
 var csms *Server
 
 // 원격 선 명령
-// clear cache - 충전 지역 인증 캐쉬(18p) 지우기
+// clear cache - 충전 지역 인증 캐쉬(18p) 지우기	- (51p)
 // ChangeAvailability - 가용성 변경(50p)	- 기기 상태 원격 명령
 // ChangeConfiguration - 구성 변경 (51p)
 // GetConfiguration	- 구성 가져오기(53p)
@@ -202,16 +203,28 @@ var csms *Server
 // UnlockConnector	- 커넥터 잠금 해제(61p)	- 커넥터 케이블 고정장치가 오작동 하는 경우 분리
 // DataTransfer	--- 커스텀 정보값
 
+// GetDiagnostics	--- 진단확인 (53p)
+// UpdateFirmware	--- 펌웨어 업데이트 (64p)
+
 func Command_Handler(w http.ResponseWriter, r *http.Request) {
 	if csms != nil {
-		log.Print("nil")
 
-		cp, b := csms.Load("device_01")
+		cp, b := csms.Load("device_02")
 		if b {
-			////ChangeConfiguration
-			// var req Payload = v16.ChangeConfigurationReq{
+			//////////////// ChangeConfiguration
+			// var req Payload = ChangeConfigurationReqTT{
 			// 	Key:   "WebSocketPingInterval",
-			// 	Value: "30",
+			// 	Value: "50",
+			// }
+			// res, err := cp.Call("ChangeConfiguration", req)
+			// if err != nil {
+			// 	log.Printf("aa %s", err)
+			// }
+			// log.Print(res)
+			// -----------------
+			// var req Payload = ChangeConfigurationReqTT{
+			// 	Key:   "MeterValuesSampledData",
+			// 	Value: "Energy.Active.Import.Register,SoC",
 			// }
 			// res, err := cp.Call("ChangeConfiguration", req)
 			// if err != nil {
@@ -219,10 +232,15 @@ func Command_Handler(w http.ResponseWriter, r *http.Request) {
 			// }
 			// log.Print(res)
 
-			////RemoteStartTransaction
-			// var req Payload = v16.RemoteStartTransactionReq{
-			// 	IdTag:       "device_01",
+			////////////////RemoteStartTransaction			54,59p 설명		-- 안보내지고 설정해야할게 많음
+			// randomIdTag := strconv.Itoa(rand.Intn(1000000000)) // 랜덤 IdTag 만들고 - db에 거래 추가하기
+
+			// ocpp_db_handler.DataTransfer_set_pay("device_02", "", "commend", "", randomIdTag, time.Now().Format("060102150405"))
+
+			// var req Payload = RemoteStartTransactionReqTT{
+			// 	IdTag:       randomIdTag,
 			// 	ConnectorId: 1,
+			// 	// ChargingProfile: v16.ChargingProfile{ChargingProfileId: 1},
 			// }
 			// res, err := cp.Call("RemoteStartTransaction", req)
 			// if err != nil {
@@ -230,21 +248,37 @@ func Command_Handler(w http.ResponseWriter, r *http.Request) {
 			// }
 			// log.Print(res)
 
-			////RemoteStopTransaction
-			var req Payload = v16.RemoteStopTransactionReq{
-				TransactionId: 456789,
-			}
-			res, err := cp.Call("RemoteStartTransaction", req)
-			if err != nil {
-				log.Printf("aa %s", err)
-			}
-			log.Print(res)
+			////////////////RemoteStopTransaction		59p 설명
 
-			////clear cache
+			// var req Payload = v16.RemoteStopTransactionReq{
+			// 	TransactionId: 456789, // 검색 선택에 의해 유동적으로 넣어야함
+			// }
+			// res, err := cp.Call("RemoteStartTransaction", req)
+			// if err != nil {
+			// 	log.Printf("aa %s", err)
+			// }
+			// log.Print(res)
 
-			////ChangeAvailability
+			////////////////clear cache
+			// var req Payload = v16.ClearCacheReq{}
+			// res, err := cp.Call("ClearCache", req)
+			// if err != nil {
+			// 	log.Printf("aa %s", err)
+			// }
+			// log.Print(res)
 
-			////Reset	- 97p
+			////////////////ChangeAvailability - 81p Inoperative = 불가능. Operative = 가능		// 기기의 메인일때의 일회용 명령. 재부팅하면 초기화되버림. db에 device테이블에서 enable을 바꿔줘야 로딩에서 재제가 된다
+			// var req Payload = v16.ChangeAvailabilityReq{
+			// 	ConnectorId: 1,
+			// 	Type:        "Inoperative",
+			// }
+			// res, err := cp.Call("ChangeAvailability", req)
+			// if err != nil {
+			// 	log.Printf("aa %s", err)
+			// }
+			// log.Print(res)
+
+			////////////////Reset	- 97p
 			//- Soft : 진행중인 충전 정상적으로 중지, stopTransaction을 보냄. 그다음 응용소프트웨어 다시시작
 			//- Hard : 하드웨어 다시 시작
 			// var req Payload = v16.ResetReq{
@@ -256,9 +290,96 @@ func Command_Handler(w http.ResponseWriter, r *http.Request) {
 			// }
 			// log.Print(res)
 
-			////UnlockConnector
+			////////////////UnlockConnector
 
-			////GetConfiguration
+			////////////////GetConfiguration
+			//- 없으면 모든 설정 반환
+			//- AllowOfflineTxForUnknownId	-- 오프라인 일때 알수없는 id가 충전을 할수있는지.
+			//- AuthorizationCacheEnabled  -- (옵션) - 인증캐쉬가 구현되어있는 경우, 인증캐쉬를 사용할건지 아닌지
+			//- AuthorizeRemoteTxRequests	-- 원격 충전을 위해 승인을 받아야하는지.
+			//- ClockAlignedDataInterval  -- 충전 스테이
+			//- ConnectionTimeOut	-- 시작부터 충전 전까지의 취소 시간
+			//- ConnectorPhaseRotation	-- 해당기기엔 해당없음 - NotApplicable로 답하면됨
+			//- GetConfigurationMaxKeys -- GetConfiguration에서 요청된 구성키의 최대수
+			//- HeartbeatInterval	-- heartbeat간격
+			//- LocalAuthorizeOffline  -오프라인 일 때 충전 포인트가 인증 캐시 및/또는 로컬 인증 목록을 사용하여 사용자에게 인증할지 여부를 제어합니다 .
+			//- LocalPreAuthorize		- 청구 지점이 중앙 시스템의 승인 응답을 기다리지 않고 트랜잭션을 시작하기 위해 승인 캐시 및/또는 로컬 승인 목록을 사용할지 여부를 제어합니다
+			//- MeterValuesAlignedData - ClockAlignedDataInterval 초 마다 MeterValues.req PDU에 포함될 측정량 세트를 규정하는 쉼표로 구분된 목록입니다. (35p)
+			//- MeterValuesSampledData	- MeterValueSampleInterval 초 마다 MeterValues.req PDU에 포함될 측정량 세트를 규정하는 쉼표로 구분된 목록입니다 . (35p)
+			//- MeterValueSampleInterval	-- "MeterValues" PDU에 의해 전송되는 계량(또는 기타) 데이터 샘플링 사이의 시간(초)입니다. 서로 다른 시간 간격으로 데이터를 보내는 대신, 일관된 간격으로 데이터를 전송하도록 설정할 때 사용됩니다. 이것은 데이터의 정확성과 타임스탬프 기반의 동기화를 보장합니다.
+			//- NumberOfConnectors	-- 충전포인터의 물리적 충전 커넥터 수
+			//- ResetRetries	--실패한 충전 포인트 재설정을 재시도하는 횟수입니다
+			//- StopTransactionOnEVSideDisconnect --true 로 설정되면 충전 포인트는 케이블이 EV에서 분리될 때 관리상 트랜잭션을 중지해야 합니다.	(49p)  false 로 설정된 경우 케이블이 EV에서 분리될 때 트랜잭션이 중지되지 않아야 합니다. EV가 다시 연결되면 에너지 전송이 다시 허용됩니다.
+			//- StopTransactionOnInvalidId --승인되지 않은 승인 상태(Invalid)를 수신한 경우 청구 지점이 진행 중인 거래를 중지할지 여부,이 트랜잭션에 대한 StartTransaction.conf	(20p)  -True/False
+			//- StopTxnAlignedData	-- StopTransaction.req MeterValues.req 의 TransactionData 요소에 포함될 시계 정렬 주기 측정량, 트랜잭션의 모든 ClockAlignedDataInterval 에 대한 PDU
+			//- StopTxnSampledData -- StopTransaction.req PDU 의 TransactionData 요소에 포함될 샘플링된 측정 량,충전 세션 시작부터 MeterValueSampleInterval 초
+			//- SupportedFeatureProfiles --지원되는 기능 프로필 목록입니다 ,Core, FirmwareManagement, LocalAuthListManagement, Reservation, SmartCharging and RemoteTrigger.
+			//- TransactionMessageAttempts -- 중앙 시스템이 거래 관련 메시지를 처리하지 못할 때 청구 지점이 거래 관련 메시지 제출을 시도해야 하는 빈도입니다.
+			//- TransactionMessageRetryInterval -- 중앙 시스템이 실패한 거래 관련 메시지를 다시 제출하기 전에 충전 지점이 기다려야 하는 시간
+			//- UnlockConnectorOnEVSideDisconnect -- true 로 설정된 경우 충전 포인트는 케이블이 EV에서 분리될 때 충전 포인트 측 케이블의 잠금을 해제해야 합니다. (49p)
+			//- WebSocketPingInterval -- 웹소켓 구현에만 해당됩니다. 0은 클라이언트 측 웹소켓 Ping/Pong을 비활성화합니다
+
+			// var req Payload = v16.GetConfigurationReq{
+			// 	Key: []string{"a", "b"},
+			// }
+			// res, err := cp.Call("GetConfiguration", req)
+			// if err != nil {
+			// 	log.Printf("aa %s", err)
+			// }
+			// log.Print(res)
+
+			////////////////DataTransfer
+			// var req Payload = v16.DataTransferReq{ // nvcat 옵션 변경
+			// 	VendorId:  "device_02",
+			// 	MessageId: "NVCATSetup",
+			// 	Data:      "{'Catid':'7283730001','Bizno':'8158100527','Serverip':'211.33.136.19','ServerPort':'9701'}",
+			// 	// Value: "{'Catid':'2393300001','Bizno':'2208115770','Serverip':'211.33.136.2','ServerPort':'9701'}",
+			// }
+			// res, err := cp.Call("DataTransfer", req)
+			// if err != nil {
+			// 	log.Printf("aa %s", err)
+			// }
+			// log.Print(res)
+
+			// var req Payload = v16.DataTransferReq{ //nvcat 재시작 - 뭔가 오류났을때
+			// 	VendorId:  "NVCAT",
+			// 	MessageId: "NVCATRestart",
+			// }
+			// res, err := cp.Call("DataTransfer", req)
+			// if err != nil {
+			// 	log.Printf("aa %s", err)
+			// }
+			// log.Print(res)
+
+			////////////////GetDiagnostics
+
+			////////////////UpdateFirmware
+			// var req Payload = v16.UpdateFirmwareReq{
+			// 	Location: "1.1" + "$$" + string("file/apk/operation/1"), // 두개짜리
+			// 	// Location:     "1.1" + "$$" + string("file/apk/operation/2"),		//스마트 폴
+			// 	RetrieveDate: time.Now().Format("2006-01-02T15:04:05.000Z"),
+			// }
+			// res, err := cp.Call("UpdateFirmware", req)
+			// if err != nil {
+			// 	log.Printf("aa %s", err)
+			// }
+			// log.Print(res)
+
+			////////////////TriggerMessage
+			//BootNotification
+			//DiagnosticsStatusNotification
+			//FirmwareStatusNotification
+			//Heartbeat
+			//MeterValues
+			//StatusNotification
+			var req Payload = v16.TriggerMessageReq{
+				RequestedMessage: "MeterValues",
+			}
+			res, err := cp.Call("TriggerMessage", req)
+			if err != nil {
+				log.Printf("aa %s", err)
+			}
+			log.Print(res)
 		}
 
 		if cp == nil {
@@ -277,6 +398,9 @@ func main() {
 		log.Println(err)
 		return
 	}
+
+	//랜덤값 기준시드 정해주기
+	rand.Seed(time.Now().UnixNano())
 
 	mux := pat.New()
 	// mux.Get("/ws", wsHandler)
@@ -350,6 +474,9 @@ func main() {
 	//앱 apk 파일 다운
 	mux.Path("/file/apk/operation/1").HandlerFunc(updateapk.App_apk_download_Handler).Methods("POST")
 
+	//앱 pole apk 파일 다운
+	mux.Path("/file/apk/operation/2").HandlerFunc(updateapk.App_pole_apk_download_Handler).Methods("POST")
+
 	//앱 업데이트 완료
 	mux.Path("/file/apk/consequnce").HandlerFunc(updateapk.App_update_complete_Handler).Methods("POST")
 
@@ -369,8 +496,39 @@ func main() {
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
+	//명령
+
+	//원격 시작
+	mux.Path("/command/rm_stt").Methods("POST")
+
+	//원격 멈춤
+	mux.Path("/command/rm_stp").Methods("POST")
+
+	//기기 사용 가능 설정
+
+	//커넥터 사용 가능 설정
+	mux.Path("/command/cg_Ab").Methods("POST")
+
+	//커넥터 해체
+
+	//리셋
+
+	//기기 설정값 리턴
+
+	//기기 설정값 설정
+
+	//nvcat 설정
+
+	//nvcat 재시작
+
+	//소프트웨어 업데이트
+
+	//기기 메시지 트리거
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
 	n.UseHandler(mux)
-	go http.ListenAndServe(":8080", n)
+	go http.ListenAndServe(":8099", n)
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -413,23 +571,27 @@ func main() {
 	csms = NewServer()
 
 	csms.AddSubProtocol("ocpp1.6")
-	csms.SetCheckOriginHandler(func(r *http.Request) bool { return true })
-	// csms.SetPreUpgradeHandler(customPreUpgradeHandler)
+	// csms.SetCheckOriginHandler(func(r *http.Request) bool { return true })
+	csms.SetCheckOriginHandler(SetCheckOriginHanler_H)
+	// csms.SetPreUpgradeHandler(customPreUpgradeHandler)	// 접속시 헤더의 Authorization 값으로 id, pw 를 보내 인증하는 방식
 	csms.SetCallQueueSize(32)
-	// csms.SetTimeoutConfig(ServerTimeoutConfig{OcppWait: 360000}) // 연결 제한시간
+	// csms.SetTimeoutConfig(ServerTimeoutConfig{OcppWait: 10000}) // 연결 제한시간
+	// csms.SetTimeoutConfig(ServerTimeoutConfig{PingWait: 5000}) // 핑 제한시간
 
 	// register charge-point-initiated action handlers
-	csms.On("Authorize", AuthorizationHandler)           //	충전 시작, 끝에 사용자가 회원인지
+	csms.On("Authorize", AuthorizationHandler)           //	충전 시작, 끝에 사용자가 회원인지 - 18p 타임아웃은 충전포인트에서 해야함
 	csms.On("BootNotification", BootNotificationHandler) //  부트
 	// csms.After("BootNotification", SendChangeConfigration)
-	csms.On("Heartbeat", HeartBeatHandler)                  // 하트비트
-	csms.On("StartTransaction", StartTransactionHandler)    // 충전시작
-	csms.On("StopTransaction", StopTransactionHandler)      // 충전 중단
-	csms.On("DataTransfer", DataTransferHandler)            // 커스텀 정보값
-	csms.On("MeterValues", MeterValuesHandler)              // 계량기값에 대한 정보(41p) - ChangeConfiguration을 이용, 데이터 수집간격을 구성, 데이터를 지정할수도있음
-	csms.On("StatusNotification", StatusNotificationHanler) //진단 상태 알림 (43p) - 상태가 변하거나 오류가나면
+	csms.On("Heartbeat", HeartBeatHandler)                                         // 하트비트
+	csms.On("StartTransaction", StartTransactionHandler)                           // 충전시작
+	csms.On("StopTransaction", StopTransactionHandler)                             // 충전 중단
+	csms.On("DataTransfer", DataTransferHandler)                                   // 커스텀 정보값
+	csms.On("MeterValues", MeterValuesHandler)                                     // 계량기값에 대한 정보(41p) - ChangeConfiguration을 이용, 데이터 수집간격을 구성, 데이터를 지정할수도있음
+	csms.On("StatusNotification", StatusNotificationHanler)                        //진단 상태 알림 (43p) - 상태가 변하거나 오류가나면, state = (82p)
+	csms.On("DiagnosticsStatusNotification", DiagnosticsStatusNotificationHandler) // 업로드 상태를 알리는 알림 (39p)
+	csms.On("FirmwareStatusNotification", FirmwareStatusNotificationHandler)       // 펌웨어 업데이트 진행사항 (39p)
 
-	// 원격 선 명령
+	// 원격 선 명령	- core
 	// clear cache - 충전 지역 인증 캐쉬(18p) 지우기
 	// ChangeAvailability - 가용성 변경(50p)	- 기기 상태 원격 명령
 	// ChangeConfiguration - 구성 변경 (51p)
@@ -440,6 +602,10 @@ func main() {
 	// UnlockConnector	- 커넥터 잠금 해제(61p)	- 커넥터 케이블 고정장치가 오작동 하는 경우 분리
 	// DataTransfer	--- 커스텀 정보값
 
+	// FIRMWARE MANAGEMENT
+	// GetDiagnostics
+	// UpdateFirmware
+
 	csms.Start("0.0.0.0:8999", "/ws/", nil)
 
 	//연결이 되어 있는지 확인
@@ -449,11 +615,24 @@ func main() {
 	//////////////////////////////////////////////////////////////////////////////////////////////
 }
 
+func SetCheckOriginHanler_H(r *http.Request) bool {
+	// log.Printf("SetCheckOriginHanler %v	\n", r)
+	log.Println("SetCheckOriginHanler")
+
+	for k, v := range csms.chargepoints {
+		log.Printf("csms.chargepoints ----- key = %v , value = %v \n", k, v)
+	}
+
+	log.Printf("access : %v", r.Header)
+	log.Printf("access : %v", r.Host)
+	return true
+}
+
 // func SendChangeConfigration(cp *ChargePoint, payload Payload) {
 
 // 	var req Payload = v16.ChangeConfigurationReq{
 // 		Key:   "WebSocketPingInterval",
-// 		Value: "30",
+// 		Value: "20",
 // 	}
 // 	res, err := cp.Call("ChangeConfiguration", req)
 // 	if err != nil {
@@ -464,8 +643,12 @@ func main() {
 
 // func customPreUpgradeHandler(w http.ResponseWriter, r *http.Request) bool {
 // 	u, p, ok := r.BasicAuth()
+
 // 	if !ok {
-// 		log.Print("error parsing basic auth")
+// 		path := strings.Split(r.URL.Path, "/")
+// 		ida := path[len(path)-1]
+// 		log.Printf("error parsing basic auth %s, %s , %s", u, p, ida)
+
 // 		w.WriteHeader(401)
 // 		return false
 // 	}
@@ -481,7 +664,7 @@ func main() {
 // }
 
 func BootNotificationHandler(cp *ChargePoint, p Payload) Payload {
-	csms.Store(cp)
+	// csms.Store(cp)
 
 	// cp2,b := csms.Load("device_01")
 
@@ -492,22 +675,32 @@ func BootNotificationHandler(cp *ChargePoint, p Payload) Payload {
 	// cp2, b := csms.Load("device_01")
 	// log.Printf("cp2 : %s, b : %v", cp2.Id, (b))
 
-	rb := ocpp_db_handler.BootNotification_update(req.ChargePointModel, "1", req.FirmwareVersion)
+	rb := ocpp_db_handler.BootNotification_db_handler(req.ChargePointModel, req.FirmwareVersion)
 
 	var res Payload
 
-	if rb {
+	switch rb {
+	case "1":
 		res = &v16.BootNotificationConf{
 			CurrentTime: time.Now().Format("2006-01-02T15:04:05.000Z"),
-			Interval:    60,
+			Interval:    10,
 			Status:      "Accepted",
 		}
-	} else {
+
+	case "2":
 		res = &v16.BootNotificationConf{
 			CurrentTime: time.Now().Format("2006-01-02T15:04:05.000Z"),
-			Interval:    60,
+			Interval:    10,
+			Status:      "Pending",
+		}
+
+	case "3":
+		res = &v16.BootNotificationConf{
+			CurrentTime: time.Now().Format("2006-01-02T15:04:05.000Z"),
+			Interval:    10,
 			Status:      "Rejected",
 		}
+
 	}
 
 	return res
@@ -524,17 +717,18 @@ func AuthorizationHandler(cp *ChargePoint, p Payload) Payload {
 	if rb {
 		res = v16.AuthorizeConf{ ///Accepted/ConcurrentTx, Expired, Blocked 및 Invalid 에 따라 유효, 만료, (일시적으로) 차단 또는 블랙리스트 로 표시
 			IdTagInfo: &v16.IdTagInfo{
-				Status: "Accepted",
+				ExpiryDate: time.Now().Format("2006-01-02T15:04:05.000Z"),
+				Status:     "Accepted",
 			},
 		}
 	} else {
 		res = v16.AuthorizeConf{ ///Accepted/ConcurrentTx, Expired, Blocked 및 Invalid 에 따라 유효, 만료, (일시적으로) 차단 또는 블랙리스트 로 표시
 			IdTagInfo: &v16.IdTagInfo{
-				Status: "Expired",
+				ExpiryDate: time.Now().Format("2006-01-02T15:04:05.000Z"),
+				Status:     "Invalid",
 			},
 		}
 	}
-	print("c")
 	return res
 }
 
@@ -553,14 +747,16 @@ func HeartBeatHandler(cp *ChargePoint, p Payload) Payload {
 func StartTransactionHandler(cp *ChargePoint, p Payload) Payload {
 	req := p.(*v16.StartTransactionReq)
 	log.Printf("\nid: %s\nStartTransaction: %v", cp.Id, req)
+	log.Printf("time stemp : %s", req.Timestamp)
 	// csms.Store(cp) // cp 저장
 
-	rb := ocpp_db_handler.StartTransaction_set_start(req.IdTag, req.ConnectorId, req.MeterStart, req.Timestamp)
+	rb := ocpp_db_handler.StartTransaction_set_start(req.IdTag, req.ConnectorId, float32(req.MeterStart)/1000.0, req.Timestamp)
 
 	var res Payload
 	Ti, err := strconv.Atoi(req.IdTag)
 
 	if err != nil {
+		log.Printf("StartTransactionHandler err %s", err)
 		rb = false
 	}
 
@@ -611,7 +807,9 @@ func StopTransactionHandler(cp *ChargePoint, p Payload) Payload {
 	// v16.MeterValue
 	// v16.SampledValue
 
-	rb := ocpp_db_handler.StopTransaction_update_end(strconv.Itoa(req.TransactionId), req.Timestamp, req.MeterStop)
+	// reason 가지고 기록을 해야하나 - 오류나 멈춤 기록에 넣어야 할듯
+
+	rb := ocpp_db_handler.StopTransaction_update_end(strconv.Itoa(req.TransactionId), req.Timestamp, float32(req.MeterStop)/1000.0)
 
 	var res Payload
 
@@ -697,6 +895,40 @@ func DataTransferHandler(cp *ChargePoint, p Payload) Payload {
 			Data:   string(sccdata),
 		}
 
+	case "c_pay": // 결제 정보 db 저장, 부분 취소
+		result := structs.CanclePayItem{}
+		err := json.Unmarshal([]byte(req.Data), &result) // json
+
+		if err != nil { // 데이터가 안맞을때
+			log.Print(" DataTransferHandler Failed to json.Unmarshal : ", err)
+			errdata, _ := json.Marshal(structs.ST_ADList{MessageType: -1})
+			res = v16.DataTransferConf{
+				Status: "UnKnownData",
+				Data:   string(errdata),
+			}
+
+			return res
+		}
+
+		e := ocpp_db_handler.DataTransfer_update_pay(result.Cancle_Pay, result.C_Pay_Day, result.C_C_Num, result.Pay_Num)
+		if !e { // db 오류가 있을때
+
+			errdata, _ := json.Marshal(structs.ST_ADList{MessageType: -1})
+
+			res = v16.DataTransferConf{
+				Status: "UnKnownData",
+				Data:   string(errdata),
+			}
+
+			return res
+		}
+
+		sccdata, _ := json.Marshal(structs.ST_ADList{MessageType: 2})
+		res = v16.DataTransferConf{
+			Status: "Accepted",
+			Data:   string(sccdata),
+		}
+
 	case "g_pay": // 전기 시세 가져오기
 
 		pydata, _ := json.Marshal(structs.ST_G_Pay{MessageType: 3, Data: structs.ST_GetPay{Pay: get_pay_DB()}})
@@ -740,18 +972,30 @@ func StatusNotificationHanler(cp *ChargePoint, p Payload) Payload {
 
 	var res Payload
 
-	if req.VendorErrorCode > "" {
-		log.Printf("VendorErrorCode is not null")
-		ocpp_db_handler.StatusNotification_device(cp.Id, req.Status, req.VendorErrorCode)
-	} else {
-		log.Printf("VendorErrorCode is null")
-		ocpp_db_handler.StatusNotification_connector(cp.Id, req.ConnectorId, req.Status, req.ErrorCode)
-	}
+	ocpp_db_handler.StatusNotification_update(cp.Id, req.ConnectorId, req.ErrorCode, req.Status, req.VendorId, req.VendorErrorCode, req.Info, req.Timestamp)
 
 	res = v16.StatusNotificationConf{} //76p
 
 	return res
 
+}
+
+func DiagnosticsStatusNotificationHandler(cp *ChargePoint, p Payload) Payload {
+	req := p.(*v16.DiagnosticsStatusNotificationReq)
+	log.Printf("\nid: %s\nHeartbeat: %v", cp.Id, req)
+
+	var res Payload = &v16.DiagnosticsStatusNotificationConf{}
+	return res
+}
+
+func FirmwareStatusNotificationHandler(cp *ChargePoint, p Payload) Payload {
+	req := p.(*v16.FirmwareStatusNotificationReq)
+	log.Printf("\nid: %s\nHeartbeat: %v", cp.Id, req)
+
+	// cp.ResetPingPong(30000) // ping 리셋
+
+	var res Payload = &v16.FirmwareStatusNotificationConf{}
+	return res
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////

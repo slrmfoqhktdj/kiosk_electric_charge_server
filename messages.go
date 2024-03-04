@@ -325,12 +325,12 @@ func unmarshalResponsePayloadv16[T any](rawPayload json.RawMessage) (Payload, er
 }
 
 type StopTransactionRequestTT struct {
-	IdTag           string           `json:"idTag,omitempty" validate:"omitempty,max=20"`
-	MeterStop       int              `json:"meterStop" validate:"required,gte=0"`
-	Timestamp       string           `json:"timestamp" validate:"required,ISO8601date"`
-	TransactionId   int              `json:"transactionId" validate:"required"`
-	Reason          string           `json:"reason,omitempty" validate:"omitempty,Reason"`
-	TransactionData []v16.MeterValue `json:"transactionData,omitempty" validate:"omitempty,dive"`
+	IdTag           string         `json:"idTag,omitempty" validate:"omitempty,max=20"`
+	MeterStop       int            `json:"meterStop" validate:"required,gte=0"`
+	Timestamp       string         `json:"timestamp" validate:"required,ISO8601date"`
+	TransactionId   int            `json:"transactionId" validate:"required"`
+	Reason          string         `json:"reason,omitempty" validate:"omitempty,Reason"`
+	TransactionData []MeterValueTT `json:"transactionData,omitempty" validate:"omitempty,dive"`
 }
 
 type StatusNotificationReqTT struct {
@@ -346,12 +346,12 @@ type StatusNotificationReqTT struct {
 type MeterValuesReqTT struct {
 	ConnectorId   int            `json:"connectorId" validate:"required,gte=0"`
 	TransactionId int            `json:"transactionId"`
-	MeterValue    []MeterValueTT `json:"meterValue" validate:"required,gt=0,dive"`
+	MeterValue    []MeterValueTT `json:"meterValue" validate:"required,dive"`
 }
 
 type MeterValueTT struct {
 	Timestamp    string           `json:"timestamp" validate:"required,ISO8601date"`
-	SampledValue []SampledValueTT `json:"sampledValue" validate:"required,gt=0,dive"`
+	SampledValue []SampledValueTT `json:"sampledValue" validate:"required,dive"`
 }
 
 type SampledValueTT struct {
@@ -363,6 +363,44 @@ type SampledValueTT struct {
 	Location  string `json:"location,omitempty" validate:"omitempty,Location"`
 	Unit      string `json:"unit,omitempty" validate:"omitempty,UnitOfMeasure"`
 }
+
+type ChangeConfigurationReqTT struct {
+	Key   string `json:"key" validate:"required,max=50"`
+	Value string `json:"value" validate:"required,max=500"`
+}
+
+type RemoteStartTransactionReqTT struct {
+	ConnectorId     int                  `json:"connectorId,omitempty" validate:"gte=0"`
+	IdTag           string               `json:"idTag" validate:"required,max=20"`
+	ChargingProfile *v16.ChargingProfile `json:"chargingProfile,omitempty" validate:"omitempty"`
+}
+
+// type ChargingProfileTT struct {
+// 	ChargingProfileId      int                `json:"chargingProfileId" validate:"required,gte=0"`
+// 	TransactionId          int                `json:"transactionId,omitempty"`
+// 	StackLevel             int                `json:"stackLevel" validate:"required,gte=0"`
+// 	ChargingProfilePurpose string             `json:"chargingProfilePurpose" validate:"required,ChargingProfilePurposeType"`
+// 	ChargingProfileKind    string             `json:"chargingProfileKind" validate:"required,ChargingProfileKindType"`
+// 	Context                string             `json:"context,omitempty" validate:"omitempty,ReadingContext"`
+// 	RecurrencyKind         string             `json:"recurrencyKind,omitempty" validate:"omitempty,RecurrencyKindType"`
+// 	ValidFrom              string             `json:"validFrom,omitempty" validate:"omitempty,ISO8601date"`
+// 	ValidTo                string             `json:"validTo,omitempty" validate:"omitempty,ISO8601date"`
+// 	ChargingSchedule       ChargingScheduleTT `json:"chargingSchedule" validate:"required,dive,required"`
+// }
+
+// type ChargingScheduleTT struct {
+// 	Duration               int                        `json:"duration,omitempty"`
+// 	StartSchedule          string                     `json:"startSchedule,omitempty" validate:"omitempty,ISO8601date"`
+// 	ChargingRateUnit       string                     `json:"chargingRateUnit" validate:"required,ChargingRateUnitType"`
+// 	ChargingSchedulePeriod []ChargingSchedulePeriodTT `json:"chargingSchedulePeriod" validate:"required,dive,required"`
+// 	MinChargingRate        float32                    `json:"minChargingRate,omitempty"`
+// }
+
+// type ChargingSchedulePeriodTT struct {
+// 	StartPeriod  string  `json:"startPeriod" validate:"required,ISO8601date"`
+// 	Limit        float32 `json:"limit" validate:"required,gte=0"`
+// 	NumberPhases int     `json:"numberPhases,omitempty"`
+// }
 
 func init() {
 
@@ -379,14 +417,14 @@ func init() {
 		"StopTransaction":               unmarshalRequestPayloadv16[StopTransactionRequestTT],
 		"CanCelReservation":             unmarshalRequestPayloadv16[v16.CancelReservationReq],
 		"ChangeAvailability":            unmarshalRequestPayloadv16[v16.ChangeAvailabilityReq],
-		"ChangeConfiguration":           unmarshalRequestPayloadv16[v16.ChangeConfigurationReq],
+		"ChangeConfiguration":           unmarshalRequestPayloadv16[ChangeConfigurationReqTT],
 		"ClearCache":                    unmarshalRequestPayloadv16[v16.ClearCacheReq],
 		"ClearChargingProfile":          unmarshalRequestPayloadv16[v16.ClearChargingProfileReq],
 		"GetCompositeSchedule":          unmarshalRequestPayloadv16[v16.GetCompositeScheduleReq],
 		"GetConfiguration":              unmarshalRequestPayloadv16[v16.GetConfigurationReq],
 		"GetDiagnostics":                unmarshalRequestPayloadv16[v16.GetDiagnosticsReq],
 		"GetLocalListVersion":           unmarshalRequestPayloadv16[v16.GetLocalListVersionReq],
-		"RemoteStartTransaction":        unmarshalRequestPayloadv16[v16.RemoteStartTransactionReq],
+		"RemoteStartTransaction":        unmarshalRequestPayloadv16[RemoteStartTransactionReqTT],
 		"RemoteStopTransaction":         unmarshalRequestPayloadv16[v16.RemoteStopTransactionReq],
 		"ReserveNow":                    unmarshalRequestPayloadv16[v16.ReserveNowReq],
 		"Reset":                         unmarshalRequestPayloadv16[v16.ResetReq],

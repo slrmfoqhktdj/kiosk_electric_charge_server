@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
-	"kiosk_electoric_charge/gosrc/ocpp_db_handler"
 	ocpplogger "kiosk_electoric_charge/gosrc/ocpplogger"
 
 	v16 "github.com/aliml92/ocpp/v16"
@@ -29,10 +29,10 @@ const (
 	writeWait = 10 * time.Second
 
 	// Time allowed to read the next pong message from the peer.
-	pingWait = 30 * time.Second
+	pingWait = 60 * time.Second
 
 	// Time allowed to read the next pong message from the peer.
-	pongWait = 30 * time.Second
+	pongWait = 60 * time.Second
 
 	// Send pings to peer with this period. Must be less than pongWait.
 	pingPeriod = (pongWait * 9) / 10
@@ -506,7 +506,7 @@ func (cp *ChargePoint) callDispatcher() {
 					break in
 				case <-cp.stopC:
 					log0.Debug("charge point is closed2")
-					ocpp_db_handler.Websocket_connector_update(cp.Id, "3")
+					// ocpp_db_handler.Websocket_connector_update(cp.Id, "3")
 					for ch := range cp.dispatcherIn {
 						log0.Debug("cancel remaning call requests in queque")
 						close(ch.recvChan)
@@ -528,7 +528,7 @@ func (cp *ChargePoint) callDispatcher() {
 			log0.Debug("broke from loop")
 		case <-cp.stopC:
 			log0.Debug("charge point is closed1")
-			ocpp_db_handler.Websocket_connector_update(cp.Id, "3")
+			// ocpp_db_handler.Websocket_connector_update(cp.Id, "3")
 			select {
 			case cleanUp <- struct{}{}:
 			default:
@@ -550,6 +550,8 @@ func (cp *ChargePoint) Call(action string, p Payload) (Payload, error) {
 	// add validator function
 	err := cp.validatePayload(p)
 	if err != nil {
+
+		log.Printf("point err :  %s", err)
 		return nil, err
 	}
 	id := uuid.New().String()

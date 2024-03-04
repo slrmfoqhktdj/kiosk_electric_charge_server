@@ -330,7 +330,13 @@ func insert_device(device_name string, device_state string, device_latitude stri
 		os.Exit(1)
 	}
 
-	log.Printf("insert_device : %v", rows)
+	rows2, err := conn.Query("INSERT INTO device(id) VALUES(?)", device_name)
+	if err != nil {
+		fmt.Printf("rows2 : %s", err)
+		os.Exit(1)
+	}
+
+	log.Printf("insert_device : %v , %v", rows, rows2)
 
 	defer conn.Close()
 }
