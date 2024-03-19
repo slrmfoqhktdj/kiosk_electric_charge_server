@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
@@ -351,12 +352,26 @@ func Command_Handler(w http.ResponseWriter, r *http.Request) {
 			// }
 			// log.Print(res)
 
-			////////////////GetDiagnostics
+			////////////////GetDiagnostics	// 진단 파일 가져오기 (로그 등등)
+			// startTime이 없으면 최근/stoptime 기준 3일전까지의 데이터
+			// stoptime이 없으면 최근까지의 데이터
+			var req Payload = v16.GetDiagnosticsReq{
+				Location:      string("file/log/operation"), // 두개짜리
+				Retries:       2,
+				RetryInterval: 10,
+				StartTime:     "2024-03-03T15:04:05.999Z",
+				StopTime:      "2024-03-06T15:04:05.999Z",
+			}
+			res, err := cp.Call("GetDiagnostics", req)
+			if err != nil {
+				log.Printf("aa %s", err)
+			}
+			log.Print(res) // 리턴값 파일명. 없으면 오류가 났거나 해당 조건에 맞는 진단이 없어 업로드 안함
 
 			////////////////UpdateFirmware
 			// var req Payload = v16.UpdateFirmwareReq{
-			// 	Location: "1.1" + "$$" + string("file/apk/operation/1"), // 두개짜리
-			// 	// Location:     "1.1" + "$$" + string("file/apk/operation/2"),		//스마트 폴
+			// //	Location: "1.1" + "$$" + string("file/apk/operation/1"), // 두개짜리
+			//  Location:     "1.1" + "$$" + string("file/apk/operation/2"),		//스마트 폴
 			// 	RetrieveDate: time.Now().Format("2006-01-02T15:04:05.000Z"),
 			// }
 			// res, err := cp.Call("UpdateFirmware", req)
@@ -372,14 +387,14 @@ func Command_Handler(w http.ResponseWriter, r *http.Request) {
 			//Heartbeat
 			//MeterValues
 			//StatusNotification
-			var req Payload = v16.TriggerMessageReq{
-				RequestedMessage: "MeterValues",
-			}
-			res, err := cp.Call("TriggerMessage", req)
-			if err != nil {
-				log.Printf("aa %s", err)
-			}
-			log.Print(res)
+			// var req Payload = v16.TriggerMessageReq{
+			// 	RequestedMessage: "MeterValues",
+			// }
+			// res, err := cp.Call("TriggerMessage", req)
+			// if err != nil {
+			// 	log.Printf("aa %s", err)
+			// }
+			// log.Print(res)
 		}
 
 		if cp == nil {
@@ -388,6 +403,34 @@ func Command_Handler(w http.ResponseWriter, r *http.Request) {
 		// log.Printf("cp2 : %s, b : %v", cp.Id, (b))
 	}
 
+}
+
+// 로그 다운 핸들러
+func get_logfile_Handler(w http.ResponseWriter, r *http.Request) {
+
+	uploadFile, header, err := r.FormFile("upload_log")
+	if err != nil { // 3
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, err)
+		return
+	}
+	dirname := "./logfiles"                                    // 4
+	os.MkdirAll(dirname, 0777)                                 // 5
+	filepath := fmt.Sprintf("%s/%s", dirname, header.Filename) // 6
+	file, err := os.Create(filepath)                           // 7
+
+	if err != nil { // 9
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, err)
+		return
+	}
+
+	io.Copy(file, uploadFile) // 10
+
+	defer file.Close() // 8
+
+	w.WriteHeader(http.StatusOK) // 11
+	fmt.Fprint(w, filepath)      // 12
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -491,6 +534,11 @@ func main() {
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
+	//로그 파일
+	mux.Path("/file/log/operation").HandlerFunc(get_logfile_Handler).Methods("POST")
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
 	//가격 리턴
 	mux.Path("/api/pay").HandlerFunc(get_pay_Handler).Methods("POST")
 
@@ -499,31 +547,45 @@ func main() {
 	//명령
 
 	//원격 시작
-	mux.Path("/command/rm_stt").Methods("POST")
+	mux.Path("/command/rmstt").HandlerFunc(RemoteStartTransaction_Handler).Methods("POST")
 
 	//원격 멈춤
-	mux.Path("/command/rm_stp").Methods("POST")
+	mux.Path("/command/rmstp").HandlerFunc(RemoteStopTransaction_Handler).Methods("POST")
 
 	//기기 사용 가능 설정
+	mux.Path("/command/abdc").HandlerFunc(AbledDevice_Handler).Methods("POST")
+
+	//캐쉬 삭제
+	mux.Path("/command/cc").HandlerFunc(ClearCache_Handler).Methods("POST")
 
 	//커넥터 사용 가능 설정
-	mux.Path("/command/cg_Ab").Methods("POST")
+	mux.Path("/command/cgab").HandlerFunc(ChangeAvailability_Handler).Methods("POST")
 
 	//커넥터 해체
 
 	//리셋
+	mux.Path("/command/rs").HandlerFunc(Reset_Handler).Methods("POST")
 
 	//기기 설정값 리턴
+	mux.Path("/command/gcfr").HandlerFunc(GetConfiguration_Handler).Methods("POST")
 
 	//기기 설정값 설정
+	mux.Path("/command/ccfr").HandlerFunc(ChangeConfiguration_Handler).Methods("POST")
 
 	//nvcat 설정
+	mux.Path("/command/ncs").HandlerFunc(NVCAT_Setting_Handler).Methods("POST")
 
 	//nvcat 재시작
+	mux.Path("/command/ncrs").HandlerFunc(NVCAT_Restart_Handler).Methods("POST")
 
 	//소프트웨어 업데이트
+	mux.Path("/command/udfw").HandlerFunc(UpdateFirmware_Handler).Methods("POST")
 
 	//기기 메시지 트리거
+	mux.Path("/command/tgmg").HandlerFunc(TriggerMessage_Handler).Methods("POST")
+
+	//로그 읽어오기
+	mux.Path("/command/gdns").HandlerFunc(GetDiagnostics_Handler).Methods("POST")
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -982,7 +1044,9 @@ func StatusNotificationHanler(cp *ChargePoint, p Payload) Payload {
 
 func DiagnosticsStatusNotificationHandler(cp *ChargePoint, p Payload) Payload {
 	req := p.(*v16.DiagnosticsStatusNotificationReq)
-	log.Printf("\nid: %s\nHeartbeat: %v", cp.Id, req)
+	log.Printf("\nid: %s\nDiagnosticsStatus: %v", cp.Id, req)
+
+	ocpp_db_handler.DiagnosticsStatusNotification_update(cp.Id, req.Status)
 
 	var res Payload = &v16.DiagnosticsStatusNotificationConf{}
 	return res
@@ -990,12 +1054,640 @@ func DiagnosticsStatusNotificationHandler(cp *ChargePoint, p Payload) Payload {
 
 func FirmwareStatusNotificationHandler(cp *ChargePoint, p Payload) Payload {
 	req := p.(*v16.FirmwareStatusNotificationReq)
-	log.Printf("\nid: %s\nHeartbeat: %v", cp.Id, req)
+	log.Printf("\nid: %s\nFirmwareStatusNotification: %v", cp.Id, req)
 
 	// cp.ResetPingPong(30000) // ping 리셋
+
+	ocpp_db_handler.FirmwareStatusNotification_update(cp.Id, req.Status)
 
 	var res Payload = &v16.FirmwareStatusNotificationConf{}
 	return res
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
+
+// 어드민핸들러
+type AbledDeviceReq struct {
+	Enabled string `json:"enabled"`
+}
+type AbledDeviceConf struct {
+	Status string `json:"status"`
+}
+
+// 원격 시작 핸들러
+func RemoteStartTransaction_Handler(w http.ResponseWriter, r *http.Request) {
+
+	id := r.Header.Get("Id")
+	msg := v16.RemoteStartTransactionReq{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&msg)
+	if err != nil {
+		return
+	}
+	defer r.Body.Close()
+
+	log.Printf("RemoteStartTransaction_Handler msg : %v", msg)
+	var returnValue *v16.RemoteStartTransactionConf
+
+	if csms != nil {
+		cp, b := csms.Load(id)
+		if b {
+
+			////////////////RemoteStartTransaction			54,59p 설명		-- 안보내지고 설정해야할게 많음
+			// randomIdTag := strconv.Itoa(rand.Intn(1000000000)) // 랜덤 IdTag 만들고 - db에 거래 추가하기
+
+			ocpp_db_handler.DataTransfer_set_pay("device_02", "", "command", "", msg.IdTag, time.Now().Format("060102150405"))
+
+			var req Payload = RemoteStartTransactionReqTT{
+				IdTag:       msg.IdTag,
+				ConnectorId: msg.ConnectorId,
+			}
+			res, err := cp.Call("RemoteStartTransaction", req)
+			if err != nil {
+				log.Printf("aa %s", err)
+			}
+			log.Print(res)
+
+			returnValue = res.(*v16.RemoteStartTransactionConf)
+
+		}
+
+		if cp == nil {
+			log.Print("cp is nil")
+			returnValue = &v16.RemoteStartTransactionConf{}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(returnValue)
+}
+
+// 원격 멈춤 핸들러
+func RemoteStopTransaction_Handler(w http.ResponseWriter, r *http.Request) {
+
+	id := r.Header.Get("Id")
+	msg := v16.RemoteStopTransactionReq{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&msg)
+	if err != nil {
+		log.Printf("RemoteStopTransaction_Handler err : %s", err)
+		return
+	}
+	defer r.Body.Close()
+
+	log.Printf("RemoteStopTransaction_Handler msg : %v", msg)
+	var returnValue *v16.RemoteStopTransactionConf
+
+	if csms != nil {
+		cp, b := csms.Load(id)
+		if b {
+
+			var req Payload = v16.RemoteStopTransactionReq{
+				TransactionId: msg.TransactionId, // 검색 선택에 의해 유동적으로 넣어야함
+			}
+			res, err := cp.Call("RemoteStopTransaction", req)
+			if err != nil {
+				log.Printf("aa %s", err)
+			}
+			log.Print(res)
+
+			returnValue = res.(*v16.RemoteStopTransactionConf)
+
+		}
+
+		if cp == nil {
+			log.Print("cp is nil")
+			returnValue = &v16.RemoteStopTransactionConf{}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(returnValue)
+}
+
+// 기기 사용 가능 설정	-- boot시 결정됨	"1" : 정상, "2": 보류, "3":불가
+func AbledDevice_Handler(w http.ResponseWriter, r *http.Request) {
+
+	id := r.Header.Get("Id")
+	msg := AbledDeviceReq{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&msg)
+	if err != nil {
+		log.Printf("AbledDevice_Handler err : %s", err)
+		return
+	}
+	defer r.Body.Close()
+
+	log.Printf("AbledDevice_Handler msg : %v", msg)
+	var returnValue string
+
+	rb := ocpp_db_handler.BootNotification_enable_update_handler(id, msg.Enabled)
+	if rb {
+		returnValue = "Accepted"
+	} else {
+		returnValue = "Rejected"
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(AbledDeviceConf{returnValue})
+}
+
+// 캐쉬삭제
+func ClearCache_Handler(w http.ResponseWriter, r *http.Request) {
+
+	id := r.Header.Get("Id")
+	msg := v16.ClearCacheReq{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&msg)
+	if err != nil {
+		log.Printf("ClearCache_Handler err : %s", err)
+		return
+	}
+	defer r.Body.Close()
+
+	log.Printf("ClearCache_Handler msg : %v", msg)
+	var returnValue *v16.ClearCacheConf
+
+	if csms != nil {
+		cp, b := csms.Load(id)
+		if b {
+
+			////////////////clear cache
+			var req Payload = v16.ClearCacheReq{}
+			res, err := cp.Call("ClearCache", req)
+			if err != nil {
+				log.Printf("aa %s", err)
+			}
+			log.Print(res)
+
+			returnValue = res.(*v16.ClearCacheConf)
+
+		}
+
+		if cp == nil {
+			log.Print("cp is nil")
+			returnValue = &v16.ClearCacheConf{}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(returnValue)
+}
+
+// 커넥터 사용 가능 설정 핸들러
+func ChangeAvailability_Handler(w http.ResponseWriter, r *http.Request) {
+
+	id := r.Header.Get("Id")
+	msg := v16.ChangeAvailabilityReq{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&msg)
+	if err != nil {
+		log.Printf("ChangeAvailability_Handler err : %s", err)
+		return
+	}
+	defer r.Body.Close()
+
+	log.Printf("ChangeAvailability_Handler msg : %v", msg)
+	var returnValue *v16.ChangeAvailabilityConf
+
+	if csms != nil {
+		cp, b := csms.Load(id)
+		if b {
+
+			////////////////ChangeAvailability - 81p Inoperative = 불가능. Operative = 가능		// 기기의 메인일때의 일회용 명령. 재부팅하면 초기화되버림. db에 device테이블에서 enable을 바꿔줘야 로딩에서 재제가 된다
+			var req Payload = v16.ChangeAvailabilityReq{
+				ConnectorId: msg.ConnectorId,
+				Type:        msg.Type,
+			}
+			res, err := cp.Call("ChangeAvailability", req)
+			if err != nil {
+				log.Printf("aa %s", err)
+			}
+			log.Print(res)
+
+			returnValue = res.(*v16.ChangeAvailabilityConf)
+
+		}
+
+		if cp == nil {
+			log.Print("cp is nil")
+			returnValue = &v16.ChangeAvailabilityConf{}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(returnValue)
+}
+
+//커넥터 해체
+
+// 리셋
+func Reset_Handler(w http.ResponseWriter, r *http.Request) {
+
+	id := r.Header.Get("Id")
+	msg := v16.ResetReq{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&msg)
+	if err != nil {
+		log.Printf("Reset_Handler err : %s", err)
+		return
+	}
+	defer r.Body.Close()
+
+	log.Printf("Reset_Handler msg : %v", msg)
+	var returnValue *v16.ResetConf
+
+	if csms != nil {
+		cp, b := csms.Load(id)
+		if b {
+
+			////////////////Reset	- 97p
+			//- Soft : 진행중인 충전 정상적으로 중지, stopTransaction을 보냄. 그다음 응용소프트웨어 다시시작
+			//- Hard : 하드웨어 다시 시작
+			var req Payload = v16.ResetReq{
+				Type: msg.Type,
+			}
+			res, err := cp.Call("Reset", req)
+			if err != nil {
+				log.Printf("aa %s", err)
+			}
+			log.Print(res)
+
+			returnValue = res.(*v16.ResetConf)
+
+		}
+
+		if cp == nil {
+			log.Print("cp is nil")
+			returnValue = &v16.ResetConf{}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(returnValue)
+}
+
+//기기 설정값 리턴
+//- 없으면 모든 설정 반환
+//- AllowOfflineTxForUnknownId	-- 오프라인 일때 알수없는 id가 충전을 할수있는지.
+//- AuthorizationCacheEnabled  -- (옵션) - 인증캐쉬가 구현되어있는 경우, 인증캐쉬를 사용할건지 아닌지
+//- AuthorizeRemoteTxRequests	-- 원격 충전을 위해 승인을 받아야하는지.
+//- ClockAlignedDataInterval  -- 충전 스테이
+//- ConnectionTimeOut	-- 시작부터 충전 전까지의 취소 시간
+//- ConnectorPhaseRotation	-- 해당기기엔 해당없음 - NotApplicable로 답하면됨
+//- GetConfigurationMaxKeys -- GetConfiguration에서 요청된 구성키의 최대수
+//- HeartbeatInterval	-- heartbeat간격
+//- LocalAuthorizeOffline  -오프라인 일 때 충전 포인트가 인증 캐시 및/또는 로컬 인증 목록을 사용하여 사용자에게 인증할지 여부를 제어합니다 .
+//- LocalPreAuthorize		- 청구 지점이 중앙 시스템의 승인 응답을 기다리지 않고 트랜잭션을 시작하기 위해 승인 캐시 및/또는 로컬 승인 목록을 사용할지 여부를 제어합니다
+//- MeterValuesAlignedData - ClockAlignedDataInterval 초 마다 MeterValues.req PDU에 포함될 측정량 세트를 규정하는 쉼표로 구분된 목록입니다. (35p)
+//- MeterValuesSampledData	- MeterValueSampleInterval 초 마다 MeterValues.req PDU에 포함될 측정량 세트를 규정하는 쉼표로 구분된 목록입니다 . (35p)
+//- MeterValueSampleInterval	-- "MeterValues" PDU에 의해 전송되는 계량(또는 기타) 데이터 샘플링 사이의 시간(초)입니다. 서로 다른 시간 간격으로 데이터를 보내는 대신, 일관된 간격으로 데이터를 전송하도록 설정할 때 사용됩니다. 이것은 데이터의 정확성과 타임스탬프 기반의 동기화를 보장합니다.
+//- NumberOfConnectors	-- 충전포인터의 물리적 충전 커넥터 수
+//- ResetRetries	--실패한 충전 포인트 재설정을 재시도하는 횟수입니다
+//- StopTransactionOnEVSideDisconnect --true 로 설정되면 충전 포인트는 케이블이 EV에서 분리될 때 관리상 트랜잭션을 중지해야 합니다.	(49p)  false 로 설정된 경우 케이블이 EV에서 분리될 때 트랜잭션이 중지되지 않아야 합니다. EV가 다시 연결되면 에너지 전송이 다시 허용됩니다.
+//- StopTransactionOnInvalidId --승인되지 않은 승인 상태(Invalid)를 수신한 경우 청구 지점이 진행 중인 거래를 중지할지 여부,이 트랜잭션에 대한 StartTransaction.conf	(20p)  -True/False
+//- StopTxnAlignedData	-- StopTransaction.req MeterValues.req 의 TransactionData 요소에 포함될 시계 정렬 주기 측정량, 트랜잭션의 모든 ClockAlignedDataInterval 에 대한 PDU
+//- StopTxnSampledData -- StopTransaction.req PDU 의 TransactionData 요소에 포함될 샘플링된 측정 량,충전 세션 시작부터 MeterValueSampleInterval 초
+//- SupportedFeatureProfiles --지원되는 기능 프로필 목록입니다 ,Core, FirmwareManagement, LocalAuthListManagement, Reservation, SmartCharging and RemoteTrigger.
+//- TransactionMessageAttempts -- 중앙 시스템이 거래 관련 메시지를 처리하지 못할 때 청구 지점이 거래 관련 메시지 제출을 시도해야 하는 빈도입니다.
+//- TransactionMessageRetryInterval -- 중앙 시스템이 실패한 거래 관련 메시지를 다시 제출하기 전에 충전 지점이 기다려야 하는 시간
+//- UnlockConnectorOnEVSideDisconnect -- true 로 설정된 경우 충전 포인트는 케이블이 EV에서 분리될 때 충전 포인트 측 케이블의 잠금을 해제해야 합니다. (49p)
+//- WebSocketPingInterval -- 웹소켓 구현에만 해당됩니다. 0은 클라이언트 측 웹소켓 Ping/Pong을 비활성화합니다
+
+func GetConfiguration_Handler(w http.ResponseWriter, r *http.Request) {
+
+	id := r.Header.Get("Id")
+	msg := v16.GetConfigurationReq{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&msg)
+	if err != nil {
+		log.Printf("GetConfiguration_Handler err : %s", err)
+		return
+	}
+	defer r.Body.Close()
+
+	log.Printf("GetConfiguration_Handler msg : %v , length : %d", msg, len(msg.Key))
+	var returnValue *GetConfigurationConfTT
+
+	if csms != nil {
+		cp, b := csms.Load(id)
+		if b {
+			////////////////GetConfiguration
+			var req Payload = v16.GetConfigurationReq{
+				Key: msg.Key,
+			}
+			res, err := cp.Call("GetConfiguration", req)
+			if err != nil {
+				log.Printf("aa %s", err)
+			}
+			log.Print(res)
+
+			returnValue = res.(*GetConfigurationConfTT)
+
+		}
+
+		if cp == nil {
+			log.Print("cp is nil")
+			returnValue = &GetConfigurationConfTT{}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(returnValue)
+}
+
+// 기기 설정값 설정
+func ChangeConfiguration_Handler(w http.ResponseWriter, r *http.Request) {
+
+	id := r.Header.Get("Id")
+	msg := ChangeConfigurationReqTT{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&msg)
+	if err != nil {
+		log.Printf("ChangeConfiguration_Handler err : %s", err)
+		return
+	}
+	defer r.Body.Close()
+
+	log.Printf("ChangeConfiguration_Handler msg : %v", msg)
+	var returnValue *v16.ChangeConfigurationConf
+
+	if csms != nil {
+		cp, b := csms.Load(id)
+		if b {
+			//////////////// ChangeConfiguration
+			var req Payload = ChangeConfigurationReqTT{
+				Key:   msg.Key,
+				Value: msg.Value,
+			}
+			res, err := cp.Call("ChangeConfiguration", req)
+			if err != nil {
+				log.Printf("aa %s", err)
+			}
+			log.Print(res)
+
+			returnValue = res.(*v16.ChangeConfigurationConf)
+
+		}
+
+		if cp == nil {
+			log.Print("cp is nil")
+			returnValue = &v16.ChangeConfigurationConf{}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(returnValue)
+}
+
+// nvcat 설정
+func NVCAT_Setting_Handler(w http.ResponseWriter, r *http.Request) {
+
+	id := r.Header.Get("Id")
+	msg := v16.DataTransferReq{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&msg)
+	if err != nil {
+		log.Printf("NVCAT_Setting_Handler err : %s", err)
+		return
+	}
+	defer r.Body.Close()
+
+	log.Printf("NVCAT_Setting_Handler msg : %v", msg)
+	var returnValue *v16.DataTransferConf
+
+	if csms != nil {
+		cp, b := csms.Load(id)
+		if b {
+
+			var req Payload = v16.DataTransferReq{ // nvcat 옵션 변경
+				VendorId:  msg.VendorId,
+				MessageId: msg.MessageId,
+				Data:      msg.Data,
+				// "{'Catid':'7283730001','Bizno':'8158100527','Serverip':'211.33.136.19','ServerPort':'9701'}"
+				// Value: "{'Catid':'2393300001','Bizno':'2208115770','Serverip':'211.33.136.2','ServerPort':'9701'}",
+			}
+			res, err := cp.Call("DataTransfer", req)
+			if err != nil {
+				log.Printf("aa %s", err)
+			}
+			log.Print(res)
+
+			returnValue = res.(*v16.DataTransferConf)
+		}
+
+		if cp == nil {
+			log.Print("cp is nil")
+			returnValue = &v16.DataTransferConf{}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(returnValue)
+}
+
+// nvcat 재시작
+func NVCAT_Restart_Handler(w http.ResponseWriter, r *http.Request) {
+
+	id := r.Header.Get("Id")
+	msg := v16.DataTransferReq{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&msg)
+	if err != nil {
+		log.Printf("NVCAT_Restart_Handler err : %s", err)
+		return
+	}
+	defer r.Body.Close()
+
+	log.Printf("NVCAT_Restart_Handler msg : %v", msg)
+	var returnValue *v16.DataTransferConf
+
+	if csms != nil {
+		cp, b := csms.Load(id)
+		if b {
+
+			var req Payload = v16.DataTransferReq{ //nvcat 재시작 - 뭔가 오류났을때
+				VendorId:  msg.VendorId,
+				MessageId: msg.MessageId,
+			}
+			res, err := cp.Call("DataTransfer", req)
+			if err != nil {
+				log.Printf("aa %s", err)
+			}
+			log.Print(res)
+
+			returnValue = res.(*v16.DataTransferConf)
+		}
+
+		if cp == nil {
+			log.Print("cp is nil")
+			returnValue = &v16.DataTransferConf{}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(returnValue)
+}
+
+//소프트웨어 업데이트
+
+func UpdateFirmware_Handler(w http.ResponseWriter, r *http.Request) {
+
+	id := r.Header.Get("Id")
+	msg := v16.UpdateFirmwareReq{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&msg)
+	if err != nil {
+		log.Printf("UpdateFirmware_Handler err : %s", err)
+		return
+	}
+	defer r.Body.Close()
+
+	log.Printf("UpdateFirmware_Handler msg : %v", msg)
+	var returnValue *v16.UpdateFirmwareConf
+
+	if csms != nil {
+		cp, b := csms.Load(id)
+		if b {
+
+			////////////////UpdateFirmware
+			var req Payload = v16.UpdateFirmwareReq{
+				// //	Location: "1.1" + "$$" + string("file/apk/operation/1"), // 두개짜리
+				// Location:     "1.1" + "$$" + string("file/apk/operation/2"), //스마트 폴
+				// RetrieveDate: time.Now().Format("2006-01-02T15:04:05.000Z"),
+				Location:      msg.Location,
+				Retries:       msg.Retries,
+				RetryInterval: msg.RetryInterval,
+				RetrieveDate:  msg.RetrieveDate,
+			}
+			res, err := cp.Call("UpdateFirmware", req)
+			if err != nil {
+				log.Printf("aa %s", err)
+			}
+			log.Print(res)
+
+			returnValue = res.(*v16.UpdateFirmwareConf)
+		}
+
+		if cp == nil {
+			log.Print("cp is nil")
+			returnValue = &v16.UpdateFirmwareConf{}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(returnValue)
+}
+
+// 기기 메시지 트리거
+func TriggerMessage_Handler(w http.ResponseWriter, r *http.Request) {
+
+	id := r.Header.Get("Id")
+	msg := v16.TriggerMessageReq{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&msg)
+	if err != nil {
+		log.Printf("TriggerMessage_Handler err : %s", err)
+		return
+	}
+	defer r.Body.Close()
+
+	log.Printf("TriggerMessage_Handler msg : %v", msg)
+	var returnValue *v16.TriggerMessageConf
+
+	if csms != nil {
+		cp, b := csms.Load(id)
+		if b {
+
+			////////////////TriggerMessage
+			//BootNotification
+			//DiagnosticsStatusNotification
+			//FirmwareStatusNotification
+			//Heartbeat
+			//MeterValues
+			//StatusNotification
+			var req Payload = v16.TriggerMessageReq{
+				RequestedMessage: msg.RequestedMessage,
+			}
+			res, err := cp.Call("TriggerMessage", req)
+			if err != nil {
+				log.Printf("aa %s", err)
+			}
+			log.Print(res)
+
+			returnValue = res.(*v16.TriggerMessageConf)
+		}
+
+		if cp == nil {
+			log.Print("cp is nil")
+			returnValue = &v16.TriggerMessageConf{}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(returnValue)
+}
+
+//로그 읽어오기
+
+func GetDiagnostics_Handler(w http.ResponseWriter, r *http.Request) {
+
+	id := r.Header.Get("Id")
+	msg := v16.GetDiagnosticsReq{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&msg)
+	if err != nil {
+		log.Printf("GetDiagnostics_Handler err : %s", err)
+		return
+	}
+	defer r.Body.Close()
+
+	log.Printf("GetDiagnostics_Handler msg : %v", msg)
+	var returnValue *v16.GetDiagnosticsConf
+
+	if csms != nil {
+		cp, b := csms.Load(id)
+		if b {
+
+			////////////////GetDiagnostics	// 진단 파일 가져오기 (로그 등등)
+			// startTime이 없으면 최근/stoptime 기준 3일전까지의 데이터
+			// stoptime이 없으면 최근까지의 데이터
+			var req Payload = v16.GetDiagnosticsReq{
+				Location: msg.Location, // 두개짜리
+				// Location:      string("file/log/operation"),
+				Retries:       msg.Retries,
+				RetryInterval: msg.RetryInterval,
+				StartTime:     msg.StartTime,
+				StopTime:      msg.StopTime,
+			}
+			res, err := cp.Call("GetDiagnostics", req)
+			if err != nil {
+				log.Printf("aa %s", err)
+			}
+			log.Print(res) // 리턴값 파일명. 없으면 오류가 났거나 해당 조건에 맞는 진단이 없어 업로드 안함
+
+			returnValue = res.(*v16.GetDiagnosticsConf)
+		}
+
+		if cp == nil {
+			log.Print("cp is nil")
+			returnValue = &v16.GetDiagnosticsConf{}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(returnValue)
+}

@@ -46,8 +46,10 @@ html,body{
 
   .inputbox{
     width: 100%;
-    display: inline;
-    
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
   }
 
   .login-form .group .label,

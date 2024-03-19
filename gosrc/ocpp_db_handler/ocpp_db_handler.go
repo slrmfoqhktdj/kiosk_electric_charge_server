@@ -9,8 +9,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-// 장치 상태 1 정상 , -1 에러,  2 충전중 , 3 연결끊김
-
 // 기기 부팅
 func BootNotification_db_handler(device_name string, device_sw_v string) string {
 	dbname := os.Getenv("DBNAME")
@@ -41,6 +39,29 @@ func BootNotification_db_handler(device_name string, device_sw_v string) string 
 	defer conn.Close()
 
 	return enabled_row
+}
+
+func BootNotification_enable_update_handler(device_name string, enabled string) bool {
+	dbname := os.Getenv("DBNAME")
+	dbdata := os.Getenv("DBDATA")
+
+	conn, err := sql.Open(dbname, dbdata)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+
+	rows, err := conn.Query("UPDATE device SET enabled = ? WHERE id = ?", enabled, device_name)
+	if err != nil {
+		fmt.Printf("rows1 : %s", err)
+		return false
+	}
+
+	log.Printf("BootNotification_enable_update_handler :  %v", rows)
+
+	defer conn.Close()
+
+	return true
 }
 
 // 기기 상태 업데이트	--- 에러,충전중,정상 써야할듯. 연결, 비연결은 관리자페이지에서 불러올때 main.go에서 csms에 있는 connector 모음집에서 꺼내와 확인해야할듯
@@ -192,6 +213,7 @@ func StopTransaction_update_end(id string, c_time_e string, c_amount float32) bo
 	return true
 }
 
+// 상태 업데이트
 func StatusNotification_update(id string, ConnectorId int, errcode string, status string, vendorid string, vendorerrorcode string, info string, timestemp string) {
 
 	dbname := os.Getenv("DBNAME")
@@ -240,4 +262,46 @@ func Metervalue_update(c_id string, t_id int, time string, value string) {
 	log.Printf("Metervalue_update : %v", rows)
 
 	defer conn.Close()
+}
+
+// 진당 상태  업데이트
+func DiagnosticsStatusNotification_update(id string, DiagnosticsStatus string) {
+
+	dbname := os.Getenv("DBNAME")
+	dbdata := os.Getenv("DBDATA")
+
+	conn, err := sql.Open(dbname, dbdata)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	rows, err := conn.Query("UPDATE device_status SET d_state = ? WHERE id = ?", DiagnosticsStatus, id)
+	if err != nil {
+		fmt.Printf("rows1 : %s", err)
+	}
+	log.Printf("DiagnosticsStatusNotification_update : %v", rows)
+
+	defer conn.Close()
+
+}
+
+// 업데이트 상태 업데이트
+func FirmwareStatusNotification_update(id string, firmwareStatus string) {
+
+	dbname := os.Getenv("DBNAME")
+	dbdata := os.Getenv("DBDATA")
+
+	conn, err := sql.Open(dbname, dbdata)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	rows, err := conn.Query("UPDATE device_status SET f_state = ? WHERE id = ?", firmwareStatus, id)
+	if err != nil {
+		fmt.Printf("rows1 : %s", err)
+	}
+	log.Printf("FirmwareStatusNotification_update : %v", rows)
+
+	defer conn.Close()
+
 }
