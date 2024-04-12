@@ -1,26 +1,28 @@
 package ocpp_db_handler
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
-	"os"
 
-	_ "github.com/go-sql-driver/mysql"
+	// _ "github.com/go-sql-driver/mysql"
+
+	"kiosk_electoric_charge/gosrc/db"
 )
 
 // 기기 부팅
 func BootNotification_db_handler(device_name string, device_sw_v string) string {
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
 
-	var enabled_row string
+	// conn, err := sql.Open(dbname, dbdata)
 
-	conn, err := sql.Open(dbname, dbdata)
+	conn, err := db.OpenDB()
 	if err != nil {
 		fmt.Println(err)
 		return "2"
 	}
+
+	var enabled_row string
 
 	err = conn.QueryRow("SELECT enabled FROM device WHERE id = ?", device_name).Scan(&enabled_row)
 	if err != nil {
@@ -41,28 +43,28 @@ func BootNotification_db_handler(device_name string, device_sw_v string) string 
 	return enabled_row
 }
 
-func BootNotification_enable_update_handler(device_name string, enabled string) bool {
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
+// func BootNotification_enable_update_handler(device_name string, enabled string) bool {
+// 	// dbname := os.Getenv("DBNAME")
+// 	// dbdata := os.Getenv("DBDATA")
 
-	conn, err := sql.Open(dbname, dbdata)
-	if err != nil {
-		fmt.Println(err)
-		return false
-	}
+// 	conn, err := db.OpenDB()
+// 	if err != nil {
+// 		fmt.Println(err)
+// 		return false
+// 	}
 
-	rows, err := conn.Query("UPDATE device SET enabled = ? WHERE id = ?", enabled, device_name)
-	if err != nil {
-		fmt.Printf("rows1 : %s", err)
-		return false
-	}
+// 	rows, err := conn.Query("UPDATE device SET enabled = ? WHERE id = ?", enabled, device_name)
+// 	if err != nil {
+// 		fmt.Printf("rows1 : %s", err)
+// 		return false
+// 	}
 
-	log.Printf("BootNotification_enable_update_handler :  %v", rows)
+// 	log.Printf("BootNotification_enable_update_handler :  %v", rows)
 
-	defer conn.Close()
+// 	defer conn.Close()
 
-	return true
-}
+// 	return true
+// }
 
 // 기기 상태 업데이트	--- 에러,충전중,정상 써야할듯. 연결, 비연결은 관리자페이지에서 불러올때 main.go에서 csms에 있는 connector 모음집에서 꺼내와 확인해야할듯
 // func Websocket_connector_update(device_name string, device_state string) bool {
@@ -90,10 +92,11 @@ func BootNotification_enable_update_handler(device_name string, enabled string) 
 
 // 결제정보 insert
 func DataTransfer_set_pay(device_id string, charge_Pay string, pay_By string, credit_num string, pay_num string, pay_day string) bool {
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
 
-	conn, err := sql.Open(dbname, dbdata)
+	// conn, err := sql.Open(dbname, dbdata)
+	conn, err := db.OpenDB()
 	if err != nil {
 		fmt.Println(err)
 		return false
@@ -114,16 +117,18 @@ func DataTransfer_set_pay(device_id string, charge_Pay string, pay_By string, cr
 
 // 결제정보 부분취소 update
 func DataTransfer_update_pay(can_pay string, c_pay_day string, c_c_num string, pay_num string) bool {
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
 
-	conn, err := sql.Open(dbname, dbdata)
+	// conn, err := sql.Open(dbname, dbdata)
+
+	conn, err := db.OpenDB()
 	if err != nil {
 		fmt.Println(err)
 		return false
 	}
 
-	rows, err := conn.Query("UPDATE pay_h SET can_pay = ? , c_pay_day = ? , c_c_num = ? WHERE pay_num = ?) VALUES(?,?,?,?)", can_pay, c_pay_day, c_c_num, pay_num)
+	rows, err := conn.Query("UPDATE pay_h SET can_pay = ? , c_pay_day = ? , c_c_num = ? WHERE pay_num = ?", can_pay, c_pay_day, c_c_num, pay_num)
 	if err != nil {
 		fmt.Printf("rows1 : %s", err)
 		return false
@@ -140,10 +145,12 @@ func DataTransfer_update_pay(can_pay string, c_pay_day string, c_c_num string, p
 func Authorize_select_payuser(pay_num string) bool {
 	var exist bool
 
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
 
-	conn, err := sql.Open(dbname, dbdata)
+	// conn, err := sql.Open(dbname, dbdata)
+
+	conn, err := db.OpenDB()
 	if err != nil {
 		fmt.Println(err)
 		return false
@@ -166,10 +173,12 @@ func Authorize_select_payuser(pay_num string) bool {
 // 충전정보 insert
 func StartTransaction_set_start(c_id string, c_conn int, c_amount float32, Timestamp string) bool {
 
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
 
-	conn, err := sql.Open(dbname, dbdata)
+	// conn, err := sql.Open(dbname, dbdata)
+
+	conn, err := db.OpenDB()
 	if err != nil {
 		fmt.Println(err)
 		return false
@@ -191,10 +200,12 @@ func StartTransaction_set_start(c_id string, c_conn int, c_amount float32, Times
 // 충전정보 update
 func StopTransaction_update_end(id string, c_time_e string, c_amount float32) bool {
 
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
 
-	conn, err := sql.Open(dbname, dbdata)
+	// conn, err := sql.Open(dbname, dbdata)
+
+	conn, err := db.OpenDB()
 	if err != nil {
 		fmt.Println(err)
 		return false
@@ -216,10 +227,12 @@ func StopTransaction_update_end(id string, c_time_e string, c_amount float32) bo
 // 상태 업데이트
 func StatusNotification_update(id string, ConnectorId int, errcode string, status string, vendorid string, vendorerrorcode string, info string, timestemp string) {
 
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
 
-	conn, err := sql.Open(dbname, dbdata)
+	// conn, err := sql.Open(dbname, dbdata)
+
+	conn, err := db.OpenDB()
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -246,10 +259,12 @@ func StatusNotification_update(id string, ConnectorId int, errcode string, statu
 // 충전량 update
 func Metervalue_update(c_id string, t_id int, time string, value string) {
 
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
 
-	conn, err := sql.Open(dbname, dbdata)
+	// conn, err := sql.Open(dbname, dbdata)
+
+	conn, err := db.OpenDB()
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -267,10 +282,12 @@ func Metervalue_update(c_id string, t_id int, time string, value string) {
 // 진당 상태  업데이트
 func DiagnosticsStatusNotification_update(id string, DiagnosticsStatus string) {
 
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
 
-	conn, err := sql.Open(dbname, dbdata)
+	// conn, err := sql.Open(dbname, dbdata)
+
+	conn, err := db.OpenDB()
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -288,10 +305,12 @@ func DiagnosticsStatusNotification_update(id string, DiagnosticsStatus string) {
 // 업데이트 상태 업데이트
 func FirmwareStatusNotification_update(id string, firmwareStatus string) {
 
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
 
-	conn, err := sql.Open(dbname, dbdata)
+	// conn, err := sql.Open(dbname, dbdata)
+
+	conn, err := db.OpenDB()
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -301,6 +320,33 @@ func FirmwareStatusNotification_update(id string, firmwareStatus string) {
 		fmt.Printf("rows1 : %s", err)
 	}
 	log.Printf("FirmwareStatusNotification_update : %v", rows)
+
+	defer conn.Close()
+
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// 에러 리스트
+func Device_Error_insert(d_id string, d_error string, v_id string, v_error string, e_info string) {
+
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
+
+	// conn, err := sql.Open(dbname, dbdata)
+
+	conn, err := db.OpenDB()
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	rows, err := conn.Query("INSERT INTO device_err(d_id,d_error,v_id,v_error,e_info) VALUES(?,?,?,?,?)", d_id, d_error, v_id, v_error, e_info)
+	if err != nil {
+		fmt.Printf("Device_Error rows1 : %s", err)
+
+	}
+
+	log.Printf("Device_Error_insert : %v", rows)
 
 	defer conn.Close()
 

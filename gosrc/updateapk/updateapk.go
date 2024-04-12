@@ -1,24 +1,26 @@
 package updateapk
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 
-	_ "github.com/go-sql-driver/mysql"
+	// _ "github.com/go-sql-driver/mysql"
 
+	"kiosk_electoric_charge/gosrc/db"
 	"kiosk_electoric_charge/gosrc/structs"
 )
 
 // 업데이트 완료
 func set_update_version(id string, version string) {
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
 
-	conn, err := sql.Open(dbname, dbdata)
+	// conn, err := sql.Open(dbname, dbdata)
+
+	conn, err := db.OpenDB()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -38,10 +40,12 @@ func set_update_version(id string, version string) {
 
 // 버전 반환 db
 func get_version_DB() string {
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
 
-	conn, err := sql.Open(dbname, dbdata)
+	// conn, err := sql.Open(dbname, dbdata)
+
+	conn, err := db.OpenDB()
 	if err != nil {
 		log.Printf(" get_version_Handler : %s", err)
 	}

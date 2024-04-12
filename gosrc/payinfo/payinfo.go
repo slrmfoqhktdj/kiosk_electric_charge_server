@@ -1,21 +1,24 @@
 package payinfo
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 
-	_ "github.com/go-sql-driver/mysql"
+	// _ "github.com/go-sql-driver/mysql"
+
+	"kiosk_electoric_charge/gosrc/db"
 )
 
-//결제정보 insert
+// 결제정보 insert
 func set_pay(device_id string, charge_amount string, charge_Pay string, pay_By string, credit_num string, pay_num string, pay_day string) {
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
 
-	conn, err := sql.Open(dbname, dbdata)
+	// conn, err := sql.Open(dbname, dbdata)
+
+	conn, err := db.OpenDB()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -32,12 +35,14 @@ func set_pay(device_id string, charge_amount string, charge_Pay string, pay_By s
 	defer conn.Close()
 }
 
-//충전시작 update
+// 충전시작 update
 func update_c_start(pay_num string, time string) {
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
 
-	conn, err := sql.Open(dbname, dbdata)
+	// conn, err := sql.Open(dbname, dbdata)
+
+	conn, err := db.OpenDB()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -54,12 +59,14 @@ func update_c_start(pay_num string, time string) {
 	defer conn.Close()
 }
 
-//충전완료 update
+// 충전완료 update
 func update_c_end(pay_num string, time string) {
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
 
-	conn, err := sql.Open(dbname, dbdata)
+	// conn, err := sql.Open(dbname, dbdata)
+
+	conn, err := db.OpenDB()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -76,7 +83,7 @@ func update_c_end(pay_num string, time string) {
 	defer conn.Close()
 }
 
-//결제 정보
+// 결제 정보
 func Set_Pay_Handler(w http.ResponseWriter, r *http.Request) {
 
 	device_id := r.PostFormValue("Device_id")
@@ -96,7 +103,7 @@ func Set_Pay_Handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, http.StatusOK)
 }
 
-//충전 시작
+// 충전 시작
 func Set_charging_start_Handler(w http.ResponseWriter, r *http.Request) {
 
 	pay_num := r.PostFormValue("Pay_num")
@@ -111,7 +118,7 @@ func Set_charging_start_Handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, http.StatusOK)
 }
 
-//충전 완료
+// 충전 완료
 func Set_charging_end_Handler(w http.ResponseWriter, r *http.Request) {
 
 	pay_num := r.PostFormValue("Pay_num")

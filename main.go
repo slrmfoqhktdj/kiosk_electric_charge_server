@@ -1,78 +1,42 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io"
+
+	// "io"
 	"log"
 	"math/rand"
 	"net/http"
-	"os"
+
+	// "os"
 	"strconv"
 
 	"time"
 
 	v16 "github.com/aliml92/ocpp/v16"
-	_ "github.com/go-sql-driver/mysql"
 
-	"github.com/gorilla/pat"
+	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
-	"github.com/urfave/negroni"
 
 	"kiosk_electoric_charge/gosrc/adminpage"
+	"kiosk_electoric_charge/gosrc/db"
 	"kiosk_electoric_charge/gosrc/ocpp_db_handler"
 	"kiosk_electoric_charge/gosrc/payinfo"
 	"kiosk_electoric_charge/gosrc/structs"
 	"kiosk_electoric_charge/gosrc/updateapk"
 
-	// "github.com/gorilla/websocket"
-	// "time"
-	// ocpp16 "github.com/lorenzodonini/ocpp-go/ocpp1.6"
-	// "github.com/lorenzodonini/ocpp-go/ocpp1.6/core"
-	// "github.com/lorenzodonini/ocpp-go/ocpp1.6/types"
 	"go.uber.org/zap"
 )
 
-// var upgrader = websocket.Upgrader{
-// 	ReadBufferSize:  1024,
-// 	WriteBufferSize: 1024,
-// }
-
-// type Message struct {
-// 	Type string      `json:"type"`
-// 	Data interface{} `json:"data"`
-// }
-
-// func wsHandler(w http.ResponseWriter, r *http.Request) {
-// 	conn, err := upgrader.Upgrade(w, r, nil)
-// 	if err != nil {
-// 		log.Println(err)
-// 		return
-// 	}
-
-// 	for {
-// 		m := &Message{}
-// 		err := conn.ReadJSON(m)
-// 		if err != nil {
-// 			log.Println(err)
-// 			return
-// 		}
-
-// 		err = conn.WriteJSON(m)
-// 		if err != nil {
-// 			log.Println(err)
-// 			return
-// 		}
-// 	}
-// }
-
 // 가격 반환 db
 func get_pay_DB() float64 {
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
 
-	conn, err := sql.Open(dbname, dbdata)
+	// conn, err := sql.Open(dbname, dbdata)
+
+	conn, err := db.OpenDB()
 	if err != nil {
 		log.Printf(" get_pay_Handler : %s", err)
 		return 0
@@ -94,12 +58,13 @@ func get_pay_DB() float64 {
 
 // 광고 리스트 반환 db
 func get_ADlist_DB(device_id string) []structs.ST_AD {
-	dbname := os.Getenv("DBNAME")
-	dbdata := os.Getenv("DBDATA")
-
 	var r []structs.ST_AD
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
 
-	conn, err := sql.Open(dbname, dbdata)
+	// conn, err := sql.Open(dbname, dbdata)
+
+	conn, err := db.OpenDB()
 	if err != nil {
 		log.Printf(" get_pay_Handler : %s", err)
 	}
@@ -161,34 +126,18 @@ func get_pay_Handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, string(data))
 }
 
-// const (
-// 	defaultListenPort        = 8887
-// 	defaultHeartbeatInterval = 600
-// )
+// 충전기 상태 정보
+func DeviceStateList_Page_Handler(w http.ResponseWriter, r *http.Request) {
 
-// func setupCentralSystem() ocpp16.CentralSystem {
-// 	return ocpp16.NewCentralSystem(nil, nil)
-// }
+	log.Print("DeviceStateList_Page_Handler")
 
-// type CentralSystemHandler struct {
-// 	// ... your own state variables
-// }
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json, _ := json.Marshal(&structs.DeviceStateListPage{Items: adminpage.Device_state_list_select(ConnectedDeivceList_Handler())})
+	w.Write(json)
 
-// func (handler *CentralSystemHandler) OnAuthorize(chargePointId string, request *core.AuthorizeRequest) (confirmation *core.AuthorizeConfirmation, err error) {
-// 	// ... your own custom logic
-// 	log.Printf("OnAuthorize %s", chargePointId)
-// 	return core.NewAuthorizationConfirmation(types.NewIdTagInfo(types.AuthorizationStatusAccepted)), nil
-// }
+}
 
-// func (handler *CentralSystemHandler) OnBootNotification(chargePointId string, request *core.BootNotificationRequest) (confirmation *core.BootNotificationConfirmation, err error) {
-// 	// ... your own custom logic
-// 	log.Printf("OnBootNotification %s", chargePointId)
-// 	return core.NewBootNotificationConfirmation(types.NewDateTime(time.Now()), defaultHeartbeatInterval, core.RegistrationStatusAccepted), nil
-// }
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-
-// log replaces standard log
 var logd *zap.SugaredLogger
 
 var csms *Server
@@ -405,37 +354,38 @@ func Command_Handler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-// 로그 다운 핸들러
-func get_logfile_Handler(w http.ResponseWriter, r *http.Request) {
+// // 로그 다운 핸들러
+// func get_logfile_Handler(w http.ResponseWriter, r *http.Request) {
 
-	uploadFile, header, err := r.FormFile("upload_log")
-	if err != nil { // 3
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, err)
-		return
-	}
-	dirname := "./logfiles"                                    // 4
-	os.MkdirAll(dirname, 0777)                                 // 5
-	filepath := fmt.Sprintf("%s/%s", dirname, header.Filename) // 6
-	file, err := os.Create(filepath)                           // 7
+// 	uploadFile, header, err := r.FormFile("upload_log")
+// 	if err != nil { // 3
+// 		w.WriteHeader(http.StatusBadRequest)
+// 		fmt.Fprint(w, err)
+// 		return
+// 	}
+// 	dirname := "./logfiles"                                    // 4
+// 	os.MkdirAll(dirname, 0777)                                 // 5
+// 	filepath := fmt.Sprintf("%s/%s", dirname, header.Filename) // 6
+// 	file, err := os.Create(filepath)                           // 7
 
-	if err != nil { // 9
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, err)
-		return
-	}
+// 	if err != nil { // 9
+// 		w.WriteHeader(http.StatusInternalServerError)
+// 		fmt.Fprint(w, err)
+// 		return
+// 	}
 
-	io.Copy(file, uploadFile) // 10
+// 	io.Copy(file, uploadFile) // 10
 
-	defer file.Close() // 8
+// 	defer file.Close() // 8
 
-	w.WriteHeader(http.StatusOK) // 11
-	fmt.Fprint(w, filepath)      // 12
-}
+// 	w.WriteHeader(http.StatusOK) // 11
+// 	fmt.Fprint(w, filepath)      // 12
+// }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 func main() {
+
 	err := godotenv.Load("./info.env")
 	if err != nil {
 		log.Println(err)
@@ -444,183 +394,6 @@ func main() {
 
 	//랜덤값 기준시드 정해주기
 	rand.Seed(time.Now().UnixNano())
-
-	mux := pat.New()
-	// mux.Get("/ws", wsHandler)
-
-	//negroni를 쓰면 따로 명시하지 않을시 "/"에 접근하면 index.html or default.html 파일에 액세스함
-	n := negroni.Classic()
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
-
-	//관리자 페이지
-	//로그인
-	mux.Path("/").HandlerFunc(adminpage.LoginPage_Handler)
-
-	// mux.Path("/login").HandlerFunc(adminpage.Login_Handler)
-	mux.Path("/login").HandlerFunc(Command_Handler)
-
-	//충전기 설치 정보
-	mux.Path("/devicelist").HandlerFunc(adminpage.Devicelist_Page_Handler)
-	//충전요금 단가 관리
-	mux.Path("/pricemng").HandlerFunc(adminpage.Pricemng_Page_Handler)
-	//소프트웨어 업데이트 관리
-	mux.Path("/swmng").HandlerFunc(adminpage.Swmng_Page_Handler)
-	//광고물 관리
-
-	//충전기별 광고 관리
-	mux.Path("/admng").HandlerFunc(adminpage.Admng_Page_Handler)
-	//충전량 및 이력조회
-	mux.Path("/chargelist").HandlerFunc(adminpage.Chargelist_Page_Handler)
-	//일자별 충전량 조회
-	//충전기 그래프 조회
-
-	//충전기 장애 이력
-	mux.Path("/errlist").HandlerFunc(adminpage.Errlist_Page_Handler)
-
-	//매출실적 및 정산 조회
-	//사용자 관리/권한
-	//공통코드
-
-	//////////////////////////////////관리자페이지 기능///////////////////////////////////
-
-	//기기 등록
-	mux.Path("/device/register").HandlerFunc(adminpage.Register_Device_Handler)
-	//기기 수정
-	mux.Path("/device/updater").HandlerFunc(adminpage.Updater_Device_Handler)
-	//기기 조회
-	mux.Path("/device/selecter").HandlerFunc(adminpage.Selecter_Device_Handler)
-	//광고업로드
-	mux.Path("/upload/ad").HandlerFunc(adminpage.Errlist_Page_Handler)
-	//apk업로드
-	mux.Path("/upload/apk").HandlerFunc(adminpage.Errlist_Page_Handler)
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
-	// 정보값 db
-
-	//결제정보
-	mux.Path("/pay/history").HandlerFunc(payinfo.Set_Pay_Handler).Methods("POST")
-
-	//충전시작
-	mux.Path("/charging/start").HandlerFunc(payinfo.Set_charging_start_Handler).Methods("POST")
-
-	//충전종료
-	mux.Path("/charging/end").HandlerFunc(payinfo.Set_charging_end_Handler).Methods("POST")
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
-
-	//앱 업데이트
-
-	//버전 확인
-	mux.Path("/api/apk/version").HandlerFunc(updateapk.Get_apk_version_Handler).Methods("POST")
-
-	//앱 apk 파일 다운
-	mux.Path("/file/apk/operation/1").HandlerFunc(updateapk.App_apk_download_Handler).Methods("POST")
-
-	//앱 pole apk 파일 다운
-	mux.Path("/file/apk/operation/2").HandlerFunc(updateapk.App_pole_apk_download_Handler).Methods("POST")
-
-	//앱 업데이트 완료
-	mux.Path("/file/apk/consequnce").HandlerFunc(updateapk.App_update_complete_Handler).Methods("POST")
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
-
-	//광고 리스트
-	mux.Path("/api/ad").HandlerFunc(get_ad_Handler).Methods("POST")
-
-	//광고 접근 후 다운
-	//경로끝에 /를 붙여줘야 html상에서 보임
-	mux.Path("/file/ad").HandlerFunc(access_ad_Handler).Methods("POST")
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
-
-	//로그 파일
-	mux.Path("/file/log/operation").HandlerFunc(get_logfile_Handler).Methods("POST")
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
-
-	//가격 리턴
-	mux.Path("/api/pay").HandlerFunc(get_pay_Handler).Methods("POST")
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
-
-	//명령
-
-	//원격 시작
-	mux.Path("/command/rmstt").HandlerFunc(RemoteStartTransaction_Handler).Methods("POST")
-
-	//원격 멈춤
-	mux.Path("/command/rmstp").HandlerFunc(RemoteStopTransaction_Handler).Methods("POST")
-
-	//기기 사용 가능 설정
-	mux.Path("/command/abdc").HandlerFunc(AbledDevice_Handler).Methods("POST")
-
-	//캐쉬 삭제
-	mux.Path("/command/cc").HandlerFunc(ClearCache_Handler).Methods("POST")
-
-	//커넥터 사용 가능 설정
-	mux.Path("/command/cgab").HandlerFunc(ChangeAvailability_Handler).Methods("POST")
-
-	//커넥터 해체
-
-	//리셋
-	mux.Path("/command/rs").HandlerFunc(Reset_Handler).Methods("POST")
-
-	//기기 설정값 리턴
-	mux.Path("/command/gcfr").HandlerFunc(GetConfiguration_Handler).Methods("POST")
-
-	//기기 설정값 설정
-	mux.Path("/command/ccfr").HandlerFunc(ChangeConfiguration_Handler).Methods("POST")
-
-	//nvcat 설정
-	mux.Path("/command/ncs").HandlerFunc(NVCAT_Setting_Handler).Methods("POST")
-
-	//nvcat 재시작
-	mux.Path("/command/ncrs").HandlerFunc(NVCAT_Restart_Handler).Methods("POST")
-
-	//소프트웨어 업데이트
-	mux.Path("/command/udfw").HandlerFunc(UpdateFirmware_Handler).Methods("POST")
-
-	//기기 메시지 트리거
-	mux.Path("/command/tgmg").HandlerFunc(TriggerMessage_Handler).Methods("POST")
-
-	//로그 읽어오기
-	mux.Path("/command/gdns").HandlerFunc(GetDiagnostics_Handler).Methods("POST")
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
-
-	n.UseHandler(mux)
-	go http.ListenAndServe(":8099", n)
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
-
-	// centralSystem := setupCentralSystem()
-
-	// // Set callback handlers for connect/disconnect
-	// centralSystem.SetNewChargePointHandler(func(chargePoint ocpp16.ChargePointConnection) {
-	// 	log.Printf("new charge point %v connected", chargePoint)
-	// })
-
-	// centralSystem.SetChargePointDisconnectedHandler(func(chargePoint ocpp16.ChargePointConnection) {
-	// 	log.Printf("charge point %v disconnected", chargePoint)
-	// })
-
-	// // Set handler for profile callbacks
-	// handler := &CentralSystemHandler{}
-	// centralSystem.SetCoreHandler(handler)
-	// centralSystem.SetLocalAuthListHandler(handler)
-	// centralSystem.SetFirmwareManagementHandler(handler)
-	// centralSystem.SetReservationHandler(handler)
-	// centralSystem.SetRemoteTriggerHandler(handler)
-	// centralSystem.SetSmartChargingHandler(handler)
-
-	// // Start central system
-	// listenPort := defaultListenPort
-	// log.Printf("starting central system")
-	// centralSystem.Start(listenPort, "/{ws}") // This call starts server in daemon mode and is blocking
-	// log.Println("stopped central system")
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
 
 	logger, _ := zap.NewDevelopment()
 	logd = logger.Sugar()
@@ -668,7 +441,230 @@ func main() {
 	// GetDiagnostics
 	// UpdateFirmware
 
-	csms.Start("0.0.0.0:8999", "/ws/", nil)
+	go csms.Start("0.0.0.0:8999", "/ws/", nil)
+
+	//연결이 되어 있는지 확인
+	// log.Printf("aa : %s", strconv.FormatBool(csms.IsConnected("device_01")))
+	// log.Printf("aa : %s", strconv.FormatBool(csms.IsConnected("device_02")))
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
+	mux := mux.NewRouter()
+	// mux := pat.New()
+	// mux.Get("/ws", wsHandler)
+
+	//negroni를 쓰면 따로 명시하지 않을시 "/"에 접근하면 index.html or default.html 파일에 액세스함
+	// n := negroni.Classic()
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
+	//관리자 페이지
+	//로그인
+	// mux.Path("/").HandlerFunc(adminpage.LoginPage_Handler)
+
+	mux.Path("/login").HandlerFunc(adminpage.Login_Handler).Methods("POST")
+	// mux.Path("/login").HandlerFunc(Command_Handler)
+	//충전기 위치 정보
+	mux.Path("/maplist").HandlerFunc(adminpage.MapList_Page_Handler).Methods("GET")
+	//충전기 설치 정보
+	mux.Path("/devicelist").HandlerFunc(adminpage.DeviceList_Page_Handler).Methods("GET")
+	//충전기 상태 정보
+	mux.Path("/devicestatelist").HandlerFunc(DeviceStateList_Page_Handler).Methods("GET")
+	//충전요금 단가 관리
+	mux.Path("/pricemng").HandlerFunc(adminpage.Pricemng_Page_Handler).Methods("GET")
+	//충전기 업데이트
+	mux.Path("/deviceupdatelist").HandlerFunc(adminpage.Updatemng_Page_Handler).Methods("GET")
+	//진단파일 요청 관리
+	mux.Path("/devicelogcmdpage").HandlerFunc(adminpage.Logmng_Page_Handler).Methods("GET")
+	//충전량 및 이력조회
+	mux.Path("/chargelist").HandlerFunc(adminpage.Chargelist_Page_Handler).Methods("GET")
+	//일자별 충전량 조회
+	mux.Path("/chargedailylist").HandlerFunc(adminpage.ChargeDailylist_Page_Handler).Methods("GET")
+	//충전기 그래프 조회
+	mux.Path("/chargedailygraph").HandlerFunc(adminpage.ChargeDailyGraph_Page_Handler).Methods("POST")
+	//충전기 장애 이력
+	mux.Path("/errlist").HandlerFunc(adminpage.Errlist_Page_Handler).Methods("GET")
+	// log.Printf("list : %v", adminpage.Charge_list_select())
+
+	//소프트웨어 업데이트 관리
+	// mux.Path("/swmng").HandlerFunc(adminpage.Swmng_Page_Handler)
+	//광고물 관리
+	//충전기별 광고 관리
+	mux.Path("/admng").HandlerFunc(adminpage.Admng_Page_Handler)
+
+	//매출실적 및 정산 조회
+	//사용자 관리/권한
+	//공통코드
+
+	//////////////////////////////////관리자페이지 기능///////////////////////////////////
+
+	//기기 등록
+	mux.Path("/device/register").HandlerFunc(adminpage.Register_Device_Handler)
+	//기기 수정
+	mux.Path("/device/updater").HandlerFunc(adminpage.Updater_Device_Handler)
+	//기기 삭제
+	mux.Path("/device/deleter").HandlerFunc(adminpage.Deleter_Device_Handler)
+
+	//단가 등록
+	mux.Path("/price/register").HandlerFunc(adminpage.Register_Price_Handler)
+	//단가 삭제
+	mux.Path("/price/deleter").HandlerFunc(adminpage.Deleter_Price_Handler)
+
+	//기기 조회
+	// mux.Path("/device/selecter").HandlerFunc(adminpage.Selecter_Device_Handler)
+
+	//광고업로드
+	mux.Path("/upload/ad").HandlerFunc(adminpage.Errlist_Page_Handler)
+	//apk업로드
+	mux.Path("/upload/apk").HandlerFunc(adminpage.Errlist_Page_Handler)
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+	// 정보값 db
+
+	//결제정보
+	mux.Path("/pay/history").HandlerFunc(payinfo.Set_Pay_Handler).Methods("POST")
+
+	//충전시작
+	mux.Path("/charging/start").HandlerFunc(payinfo.Set_charging_start_Handler).Methods("POST")
+
+	//충전종료
+	mux.Path("/charging/end").HandlerFunc(payinfo.Set_charging_end_Handler).Methods("POST")
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
+	//앱 업데이트
+
+	//버전 확인
+	mux.Path("/api/apk/version").HandlerFunc(updateapk.Get_apk_version_Handler).Methods("POST")
+
+	//앱 apk 파일 다운
+	mux.Path("/file/apk/operation/1").HandlerFunc(updateapk.App_apk_download_Handler).Methods("POST")
+
+	//앱 pole apk 파일 다운
+	mux.Path("/file/apk/operation/2").HandlerFunc(updateapk.App_pole_apk_download_Handler).Methods("POST")
+
+	//앱 업데이트 완료
+	mux.Path("/file/apk/consequnce").HandlerFunc(updateapk.App_update_complete_Handler).Methods("POST")
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
+	//광고 리스트
+	mux.Path("/api/ad").HandlerFunc(get_ad_Handler).Methods("POST")
+
+	//광고 접근 후 다운
+	//경로끝에 /를 붙여줘야 html상에서 보임
+	mux.Path("/file/ad").HandlerFunc(access_ad_Handler).Methods("POST")
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
+	//로그 파일
+	// mux.Path("/file/log/operation").HandlerFunc(get_logfile_Handler).Methods("POST")
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
+	//가격 리턴
+	mux.Path("/api/pay").HandlerFunc(get_pay_Handler).Methods("POST")
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
+	//명령
+	// mux.Path("/command/cdl").HandlerFunc(ConnectedDeivceList_Handler).Methods("POST")
+
+	//원격 시작
+	mux.Path("/command/rmstt").HandlerFunc(RemoteStartTransaction_Handler).Methods("POST")
+
+	//원격 멈춤
+	mux.Path("/command/rmstp").HandlerFunc(RemoteStopTransaction_Handler).Methods("POST")
+
+	//기기 사용 가능 설정
+	// mux.Path("/command/abdc").HandlerFunc(AbledDevice_Handler).Methods("POST")
+
+	//캐쉬 삭제
+	mux.Path("/command/cc").HandlerFunc(ClearCache_Handler).Methods("POST")
+
+	//커넥터 사용 가능 설정
+	mux.Path("/command/cgab").HandlerFunc(ChangeAvailability_Handler).Methods("POST")
+
+	//커넥터 해체
+
+	//리셋
+	mux.Path("/command/rs").HandlerFunc(Reset_Handler).Methods("POST")
+
+	//기기 설정값 리턴
+	mux.Path("/command/gcfr").HandlerFunc(GetConfiguration_Handler).Methods("POST")
+
+	//기기 설정값 설정
+	mux.Path("/command/ccfr").HandlerFunc(ChangeConfiguration_Handler).Methods("POST")
+
+	//nvcat 설정
+	mux.Path("/command/ncs").HandlerFunc(NVCAT_Setting_Handler).Methods("POST")
+
+	//nvcat 재시작
+	mux.Path("/command/ncrs").HandlerFunc(NVCAT_Restart_Handler).Methods("POST")
+
+	//소프트웨어 업데이트
+	mux.Path("/command/udfw").HandlerFunc(UpdateFirmware_Handler).Methods("POST")
+
+	//기기 메시지 트리거
+	mux.Path("/command/tgmg").HandlerFunc(TriggerMessage_Handler).Methods("POST")
+
+	//로그 읽어오기
+	mux.Path("/command/gdns").HandlerFunc(GetDiagnostics_Handler).Methods("POST")
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
+	// n.UseHandler(mux)
+	http.ListenAndServe(":8099", mux)
+
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
+	// logger, _ := zap.NewDevelopment()
+	// logd = logger.Sugar()
+	// defer logd.Sync()
+
+	// // set ocpp library's logger to zap logger
+	// SetLogger(logd)
+
+	// // start csms server with default configurations
+	// csms = NewServer()
+
+	// csms.AddSubProtocol("ocpp1.6")
+	// // csms.SetCheckOriginHandler(func(r *http.Request) bool { return true })
+	// csms.SetCheckOriginHandler(SetCheckOriginHanler_H)
+	// // csms.SetPreUpgradeHandler(customPreUpgradeHandler)	// 접속시 헤더의 Authorization 값으로 id, pw 를 보내 인증하는 방식
+	// csms.SetCallQueueSize(32)
+	// // csms.SetTimeoutConfig(ServerTimeoutConfig{OcppWait: 10000}) // 연결 제한시간
+	// // csms.SetTimeoutConfig(ServerTimeoutConfig{PingWait: 5000}) // 핑 제한시간
+
+	// // register charge-point-initiated action handlers
+	// csms.On("Authorize", AuthorizationHandler)           //	충전 시작, 끝에 사용자가 회원인지 - 18p 타임아웃은 충전포인트에서 해야함
+	// csms.On("BootNotification", BootNotificationHandler) //  부트
+	// // csms.After("BootNotification", SendChangeConfigration)
+	// csms.On("Heartbeat", HeartBeatHandler)                                         // 하트비트
+	// csms.On("StartTransaction", StartTransactionHandler)                           // 충전시작
+	// csms.On("StopTransaction", StopTransactionHandler)                             // 충전 중단
+	// csms.On("DataTransfer", DataTransferHandler)                                   // 커스텀 정보값
+	// csms.On("MeterValues", MeterValuesHandler)                                     // 계량기값에 대한 정보(41p) - ChangeConfiguration을 이용, 데이터 수집간격을 구성, 데이터를 지정할수도있음
+	// csms.On("StatusNotification", StatusNotificationHanler)                        //진단 상태 알림 (43p) - 상태가 변하거나 오류가나면, state = (82p)
+	// csms.On("DiagnosticsStatusNotification", DiagnosticsStatusNotificationHandler) // 업로드 상태를 알리는 알림 (39p)
+	// csms.On("FirmwareStatusNotification", FirmwareStatusNotificationHandler)       // 펌웨어 업데이트 진행사항 (39p)
+
+	// // 원격 선 명령	- core
+	// // clear cache - 충전 지역 인증 캐쉬(18p) 지우기
+	// // ChangeAvailability - 가용성 변경(50p)	- 기기 상태 원격 명령
+	// // ChangeConfiguration - 구성 변경 (51p)
+	// // GetConfiguration	- 구성 가져오기(53p)
+	// // RemoteStartTransaction - 원격 시작 트랜잭션(54p)
+	// // RemoteStopTransaction - 원격 중지 트랜잭션(54p) -
+	// // Reset	- 초기화 (57p)	- 진행중이면 stoptransaction 보내야함 -> 응용프로그램 or 하드웨어 다시 시작
+	// // UnlockConnector	- 커넥터 잠금 해제(61p)	- 커넥터 케이블 고정장치가 오작동 하는 경우 분리
+	// // DataTransfer	--- 커스텀 정보값
+
+	// // FIRMWARE MANAGEMENT
+	// // GetDiagnostics
+	// // UpdateFirmware
+
+	// csms.Start("0.0.0.0:8999", "/ws/", nil)
 
 	//연결이 되어 있는지 확인
 	// log.Printf("aa : %s", strconv.FormatBool(csms.IsConnected("device_01")))
@@ -1020,7 +1016,13 @@ func MeterValuesHandler(cp *ChargePoint, p Payload) Payload {
 	log.Printf("size : %d, values : %s", len(req.MeterValue), req.MeterValue[0].SampledValue[0].Value)
 	// csms.Store(cp) // cp 저장
 
-	ocpp_db_handler.Metervalue_update(strconv.Itoa(req.TransactionId), req.ConnectorId, req.MeterValue[0].Timestamp, req.MeterValue[0].SampledValue[0].Value)
+	var TID string
+
+	if len(strconv.Itoa(req.TransactionId)) < 8 {
+		TID = fmt.Sprintf("%08d", req.TransactionId)
+	}
+
+	ocpp_db_handler.Metervalue_update(TID, req.ConnectorId, req.MeterValue[0].Timestamp, req.MeterValue[0].SampledValue[0].Value)
 
 	var res Payload = v16.MeterValuesConf{} //72p
 	return res
@@ -1035,6 +1037,10 @@ func StatusNotificationHanler(cp *ChargePoint, p Payload) Payload {
 	var res Payload
 
 	ocpp_db_handler.StatusNotification_update(cp.Id, req.ConnectorId, req.ErrorCode, req.Status, req.VendorId, req.VendorErrorCode, req.Info, req.Timestamp)
+	//만약 에러코드가 존재하면 에러테이블에 저장하기
+	if req.ErrorCode != "NoError" || req.VendorId != "" || req.Info != "" {
+		ocpp_db_handler.Device_Error_insert(cp.Id, req.ErrorCode, req.VendorId, req.VendorErrorCode, req.Info)
+	}
 
 	res = v16.StatusNotificationConf{} //76p
 
@@ -1074,6 +1080,26 @@ type AbledDeviceConf struct {
 	Status string `json:"status"`
 }
 
+// type ConnctedDevice struct {
+// 	Id string `json:"id"`
+// }
+
+// 원격 연결되어있는 기기 리스트 반환
+func ConnectedDeivceList_Handler() []string {
+
+	var returnValue []string
+
+	for k := range csms.chargepoints {
+		// log.Printf("csms.chargepoints ----- key = %v , value = %v \n", k, v)
+		log.Printf("csms.chargepoints ----- key = %v \n", k)
+		// a := ConnctedDevice{Id: k}
+
+		returnValue = append(returnValue, k)
+	}
+
+	return returnValue
+}
+
 // 원격 시작 핸들러
 func RemoteStartTransaction_Handler(w http.ResponseWriter, r *http.Request) {
 
@@ -1096,7 +1122,7 @@ func RemoteStartTransaction_Handler(w http.ResponseWriter, r *http.Request) {
 			////////////////RemoteStartTransaction			54,59p 설명		-- 안보내지고 설정해야할게 많음
 			// randomIdTag := strconv.Itoa(rand.Intn(1000000000)) // 랜덤 IdTag 만들고 - db에 거래 추가하기
 
-			ocpp_db_handler.DataTransfer_set_pay("device_02", "", "command", "", msg.IdTag, time.Now().Format("060102150405"))
+			ocpp_db_handler.DataTransfer_set_pay(id, "", "command", "", msg.IdTag, time.Now().Format("060102150405"))
 
 			var req Payload = RemoteStartTransactionReqTT{
 				IdTag:       msg.IdTag,
@@ -1167,33 +1193,33 @@ func RemoteStopTransaction_Handler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(returnValue)
 }
 
-// 기기 사용 가능 설정	-- boot시 결정됨	"1" : 정상, "2": 보류, "3":불가
-func AbledDevice_Handler(w http.ResponseWriter, r *http.Request) {
+// // 기기 사용 가능 설정	-- boot시 결정됨	"1" : 정상, "2": 보류, "3":불가
+// func AbledDevice_Handler(w http.ResponseWriter, r *http.Request) {
 
-	id := r.Header.Get("Id")
-	msg := AbledDeviceReq{}
-	decoder := json.NewDecoder(r.Body)
-	err := decoder.Decode(&msg)
-	if err != nil {
-		log.Printf("AbledDevice_Handler err : %s", err)
-		return
-	}
-	defer r.Body.Close()
+// 	id := r.Header.Get("Id")
+// 	msg := AbledDeviceReq{}
+// 	decoder := json.NewDecoder(r.Body)
+// 	err := decoder.Decode(&msg)
+// 	if err != nil {
+// 		log.Printf("AbledDevice_Handler err : %s", err)
+// 		return
+// 	}
+// 	defer r.Body.Close()
 
-	log.Printf("AbledDevice_Handler msg : %v", msg)
-	var returnValue string
+// 	log.Printf("AbledDevice_Handler msg : %v", msg)
+// 	var returnValue string
 
-	rb := ocpp_db_handler.BootNotification_enable_update_handler(id, msg.Enabled)
-	if rb {
-		returnValue = "Accepted"
-	} else {
-		returnValue = "Rejected"
-	}
+// 	rb := ocpp_db_handler.BootNotification_enable_update_handler(id, msg.Enabled)
+// 	if rb {
+// 		returnValue = "Accepted"
+// 	} else {
+// 		returnValue = "Rejected"
+// 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(AbledDeviceConf{returnValue})
-}
+// 	w.Header().Set("Content-Type", "application/json")
+// 	w.WriteHeader(http.StatusCreated)
+// 	json.NewEncoder(w).Encode(AbledDeviceConf{returnValue})
+// }
 
 // 캐쉬삭제
 func ClearCache_Handler(w http.ResponseWriter, r *http.Request) {
@@ -1208,7 +1234,6 @@ func ClearCache_Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	log.Printf("ClearCache_Handler msg : %v", msg)
 	var returnValue *v16.ClearCacheConf
 
 	if csms != nil {
@@ -1299,7 +1324,6 @@ func Reset_Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	log.Printf("Reset_Handler msg : %v", msg)
 	var returnValue *v16.ResetConf
 
 	if csms != nil {
