@@ -14,6 +14,8 @@ type ST_GetVersion struct {
 	Version string
 }
 
+type ContextStruct struct{}
+
 ///////////////////////////////
 
 // Post data 구조체
@@ -25,6 +27,7 @@ type LoginData struct { //로그인 데이터
 type DeviceGraphTimeData struct { //충전기 그래프 조회 데이터
 	StartTime string `json:"starttime"`
 	EndTime   string `json:"endtime"`
+	DeviceID  string `json:"device_id"`
 }
 
 ///////////////////////////////
@@ -34,8 +37,17 @@ type Page struct {
 	Title string
 }
 
-type LoginPage struct { // 충전기 설치정보 페이지
-	Items []LoginDataForm `json:"item"`
+type LoginPage struct { // 사용자 로그인 페이지
+	Items LoginDataForm `json:"item"`
+}
+
+type DashboardPage struct { // 대쉬보드 페이지
+	List  []DeviceListItem       `json:"list"`
+	State []DeviceStateListItem  `json:"state"`
+	Price []PriceListItem        `json:"price"`
+	Daily []ChargeDailyListItem  `json:"daily"`
+	Graph []ChargeDailyGraphItem `json:"graph"`
+	Maps  []MapListItem          `json:"maps"`
 }
 
 type MapListPage struct { // 충전기 위치정보 페이지
@@ -71,7 +83,8 @@ type ChargeDailyListPage struct { // 일자별 충전량 조회 페이지
 }
 
 type ChargeDailyGraphPage struct { // 충전기 그래프 조회 페이지
-	Items []ChargeDailyGraphItem `json:"item"`
+	ListItem []ChargeDailyGraphListItem `json:"listitem"`
+	Items    []ChargeDailyGraphItem     `json:"item"`
 }
 
 type ErrListPage struct { // 충전기 장애 이력 관리 페이지
@@ -190,6 +203,10 @@ type ChargeDailyListItem struct { // 일자별 충전량 조회 구조체
 	Amount *string `json:"amount"`
 	Count  *string `json:"count"`
 	Pay    *string `json:"pay"`
+}
+
+type ChargeDailyGraphListItem struct { // 충전기 그래프 기기 리스트 조회 구조체
+	Id string `json:"id"`
 }
 
 type ChargeDailyGraphItem struct { // 충전기 그래프 조회 구조체

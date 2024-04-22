@@ -8,13 +8,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	// _ "github.com/go-sql-driver/mysql"
 
 	"text/template"
 
+	"kiosk_electoric_charge/gosrc/adminjwt"
 	"kiosk_electoric_charge/gosrc/db"
 	"kiosk_electoric_charge/gosrc/structs"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 // html 구획 나누기
@@ -57,34 +61,48 @@ func contains(s []string, str string) bool {
 }
 
 // 로그인
-func Login_select(email string, pwd string) []structs.LoginDataForm {
-	var result []structs.LoginDataForm
+func Login_select(email string, pwd string) structs.LoginDataForm {
+	var result structs.LoginDataForm
 	// dbname := os.Getenv("DBNAME")
 	// dbdata := os.Getenv("DBDATA")
 
 	// conn, err := sql.Open(dbname, dbdata)
 
+	var Email string
+	var Name string
+	var Password string
+
 	conn, err := db.OpenDB()
 	if err != nil {
-		log.Printf(" User_survey_a err : %s", err)
+		log.Printf(" Login_select db err : %s", err)
 	}
 
-	rows, err := conn.Query("SELECT email,name FROM admin_user WHERE email = ? AND password = ?", email, pwd)
+	if err := conn.QueryRow("SELECT email,name,password FROM admin_user WHERE email = ?", email).Scan(&Email, &Name, &Password); err != nil {
+		log.Printf("select user, %v", err)
+		return result
+	}
+
+	// 암호화
+	// hashedPassword, err := bcrypt.GenerateFromPassword([]byte(pwd), 11) // 10 means difficulty
+	// if err != nil {
+	// 	log.Printf("failed to GenerateFromPassword: %v", err)
+	// 	return result
+	// }
+
+	if err := bcrypt.CompareHashAndPassword([]byte(Password), []byte(pwd)); err != nil {
+		log.Printf("incorrect password, %v", err)
+		return result
+	}
+
+	tokenString, err := adminjwt.GenerateToken(Name)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return result
 	}
 
-	for rows.Next() {
-		var Email string
-		var Name string
+	log.Printf("key is %v", tokenString)
 
-		rows.Scan(&Email, &Name)
+	result = structs.LoginDataForm{Email: Email, Name: tokenString}
 
-		m := structs.LoginDataForm{Email: Email, Name: Name}
-		result = append(result, m)
-	}
-	defer rows.Close()
 	defer conn.Close()
 
 	return result
@@ -173,7 +191,7 @@ func device_list_select() []structs.DeviceListItem {
 }
 
 // 충전기 상태 정보
-func Device_state_list_select(dconn []string) []structs.DeviceStateListItem {
+func device_state_list_select(dconn []string) []structs.DeviceStateListItem {
 	var result []structs.DeviceStateListItem
 	// dbname := os.Getenv("DBNAME")
 	// dbdata := os.Getenv("DBDATA")
@@ -486,7 +504,44 @@ func charge_daily_list_select() []structs.ChargeDailyListItem {
 }
 
 // 충전기 그래프 조회
-func charge_daily_graph_select(starttime, endtime string) []structs.ChargeDailyGraphItem {
+func charge_daily_graph_list_select() []structs.ChargeDailyGraphListItem {
+	var result []structs.ChargeDailyGraphListItem
+	// dbname := os.Getenv("DBNAME")
+	// dbdata := os.Getenv("DBDATA")
+
+	// conn, err := sql.Open(dbname, dbdata)
+
+	conn, err := db.OpenDB()
+	if err != nil {
+		log.Printf(" User_survey_a err : %s", err)
+	}
+
+	rows, err := conn.Query("SELECT id FROM device")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	for rows.Next() {
+		var Id string
+
+		rows.Scan(&Id)
+
+		m := structs.ChargeDailyGraphListItem{Id: Id}
+
+		result = append(result, m)
+
+	}
+	defer rows.Close()
+	defer conn.Close()
+
+	// log.Printf(" charge list : %s", result)
+
+	return result
+}
+
+// 충전기 그래프 조회
+func charge_daily_graph_select(starttime, endtime, device_id string) []structs.ChargeDailyGraphItem {
 	var result []structs.ChargeDailyGraphItem
 	// dbname := os.Getenv("DBNAME")
 	// dbdata := os.Getenv("DBDATA")
@@ -498,31 +553,61 @@ func charge_daily_graph_select(starttime, endtime string) []structs.ChargeDailyG
 		log.Printf(" User_survey_a err : %s", err)
 	}
 
-	rows, err := conn.Query("SELECT A.n AS time , ifnull(B.amount,0) AS amount, ifnull(B.count,0) AS count,ifnull(B.pay,0) AS pay  FROM (SELECT @N := @N +1 AS n FROM charge_h, (select @N:=-1 from DUAL ) NN LIMIT 24) AS A LEFT JOIN (SELECT Hour(DATE_ADD(CAST(c.c_time_e as DATETIME),INTERVAL 9 HOUR)) as hh, sum(CAST(c.c_amount as FLOAT)) as amount ,COUNT(c.c_amount) as count ,sum(CAST(p.c_pay as UNSIGNED)-CAST(IFNULL(p.can_pay,0) as UNSIGNED)) as pay FROM charge_h as c RIGHT JOIN pay_h as p  ON c.c_id = p.pay_num WHERE DATE_ADD(CAST(c.c_time_e as DATETIME),INTERVAL 9 HOUR) BETWEEN ? AND ? GROUP BY hh ORDER BY hh) AS B ON A.n = B.hh", starttime, endtime)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+	//검색하는 기기 이름이 전체 or 개별
+	if device_id == "전체" {
+		rows, err := conn.Query("SELECT A.n AS time , ifnull(B.amount,0) AS amount, ifnull(B.count,0) AS count,ifnull(B.pay,0) AS pay  FROM (SELECT @N := @N +1 AS n FROM charge_h, (select @N:=-1 from DUAL ) NN LIMIT 24) AS A LEFT JOIN (SELECT Hour(DATE_ADD(CAST(c.c_time_e as DATETIME),INTERVAL 9 HOUR)) as hh, sum(CAST(c.c_amount as FLOAT)) as amount ,COUNT(c.c_amount) as count ,sum(CAST(p.c_pay as UNSIGNED)-CAST(IFNULL(p.can_pay,0) as UNSIGNED)) as pay FROM charge_h as c RIGHT JOIN pay_h as p  ON c.c_id = p.pay_num WHERE DATE_ADD(CAST(c.c_time_e as DATETIME),INTERVAL 9 HOUR) BETWEEN ? AND ? GROUP BY hh ORDER BY hh) AS B ON A.n = B.hh", starttime, endtime)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		for rows.Next() {
+			var Time string
+			var Amount *string
+			var Count *string
+			var Pay *string
+
+			rows.Scan(&Time, &Amount, &Count, &Pay)
+
+			m := structs.ChargeDailyGraphItem{Time: Time, Amount: Amount, Count: Count, Pay: Pay}
+
+			result = append(result, m)
+
+		}
+		defer rows.Close()
+		defer conn.Close()
+
+		// log.Printf(" charge list : %s", result)
+
+		return result
+	} else {
+		rows, err := conn.Query("SELECT A.n AS time , ifnull(B.amount,0) AS amount, ifnull(B.count,0) AS count,ifnull(B.pay,0) AS pay  FROM (SELECT @N := @N +1 AS n FROM charge_h, (select @N:=-1 from DUAL ) NN LIMIT 24) AS A LEFT JOIN (SELECT Hour(DATE_ADD(CAST(c.c_time_e as DATETIME),INTERVAL 9 HOUR)) as hh, sum(CAST(c.c_amount as FLOAT)) as amount ,COUNT(c.c_amount) as count ,sum(CAST(p.c_pay as UNSIGNED)-CAST(IFNULL(p.can_pay,0) as UNSIGNED)) as pay FROM charge_h as c RIGHT JOIN pay_h as p  ON c.c_id = p.pay_num WHERE DATE_ADD(CAST(c.c_time_e as DATETIME),INTERVAL 9 HOUR) BETWEEN ? AND ? AND p.d_id = ?  GROUP BY hh ORDER BY hh) AS B ON A.n = B.hh", starttime, endtime, device_id)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		for rows.Next() {
+			var Time string
+			var Amount *string
+			var Count *string
+			var Pay *string
+
+			rows.Scan(&Time, &Amount, &Count, &Pay)
+
+			m := structs.ChargeDailyGraphItem{Time: Time, Amount: Amount, Count: Count, Pay: Pay}
+
+			result = append(result, m)
+
+		}
+		defer rows.Close()
+		defer conn.Close()
+
+		// log.Printf(" charge list : %s", result)
+
+		return result
 	}
 
-	for rows.Next() {
-		var Time string
-		var Amount *string
-		var Count *string
-		var Pay *string
-
-		rows.Scan(&Time, &Amount, &Count, &Pay)
-
-		m := structs.ChargeDailyGraphItem{Time: Time, Amount: Amount, Count: Count, Pay: Pay}
-
-		result = append(result, m)
-
-	}
-	defer rows.Close()
-	defer conn.Close()
-
-	// log.Printf(" charge list : %s", result)
-
-	return result
 }
 
 // 충전기 장애 이력
@@ -589,6 +674,31 @@ func Login_Handler(w http.ResponseWriter, r *http.Request) {
 	w.Write(json)
 }
 
+// 대쉬보드 정보
+func Dashboard_Page_Handler(w http.ResponseWriter, r *http.Request, conn []string) {
+
+	log.Print("Dashboard_Page_Handler")
+
+	// 한국 시간대 로드
+	loc, err := time.LoadLocation("Asia/Seoul")
+	if err != nil {
+		fmt.Println("시간대 로딩 에러:", err)
+		return
+	}
+
+	// 현재 시간을 한국 시간대로 설정
+	now := time.Now().In(loc)
+
+	Device_Id := "전체"
+	StartTime := fmt.Sprintf("%s %s", now.AddDate(0, 0, -3).Format("2006-01-02"), "00:00:00")
+	EndTime := fmt.Sprintf("%s %s", now.Format("2006-01-02"), "23:59:59")
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json, _ := json.Marshal(&structs.DashboardPage{List: device_list_select(), State: device_state_list_select(conn), Price: price_list_select(), Daily: charge_daily_list_select(), Maps: map_list_select(), Graph: charge_daily_graph_select(StartTime, EndTime, Device_Id)})
+	w.Write(json)
+}
+
 // 충전기 위치 정보
 func MapList_Page_Handler(w http.ResponseWriter, r *http.Request) {
 
@@ -611,21 +721,16 @@ func DeviceList_Page_Handler(w http.ResponseWriter, r *http.Request) {
 	w.Write(json)
 }
 
-// // 충전기 상태 정보
-// func DeviceStateList_Page_Handler(conn []string) http.HandlerFunc {
+// 충전기 상태 정보
+func DeviceStateList_Page_Handler(w http.ResponseWriter, r *http.Request, conn []string) {
 
-// 	return func(w http.ResponseWriter, r *http.Request) {
+	log.Print("DeviceStateList_Page_Handler")
 
-// 		log.Print("DeviceStateList_Page_Handler")
-// 		log.Printf("list %v", conn)
-
-// 		w.WriteHeader(http.StatusOK)
-// 		w.Header().Set("Content-Type", "application/json")
-// 		json, _ := json.Marshal(&structs.DeviceStateListPage{Items: device_state_list_select(conn)})
-// 		w.Write(json)
-// 	}
-
-// }
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json, _ := json.Marshal(&structs.DeviceStateListPage{Items: device_state_list_select(conn)})
+	w.Write(json)
+}
 
 // 충전요금 단가 관리
 func Pricemng_Page_Handler(w http.ResponseWriter, r *http.Request) {
@@ -699,7 +804,7 @@ func ChargeDailyGraph_Page_Handler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.ChargeDailyGraphPage{Items: charge_daily_graph_select(msg.StartTime, msg.EndTime)})
+	json, _ := json.Marshal(&structs.ChargeDailyGraphPage{ListItem: charge_daily_graph_list_select(), Items: charge_daily_graph_select(msg.StartTime, msg.EndTime, msg.DeviceID)})
 	w.Write(json)
 }
 

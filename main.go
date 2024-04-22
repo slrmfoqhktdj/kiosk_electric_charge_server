@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 
 	// "io"
 	"log"
@@ -15,10 +18,12 @@ import (
 	"time"
 
 	v16 "github.com/aliml92/ocpp/v16"
+	"github.com/dgrijalva/jwt-go"
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 
+	"kiosk_electoric_charge/gosrc/adminjwt"
 	"kiosk_electoric_charge/gosrc/adminpage"
 	"kiosk_electoric_charge/gosrc/db"
 	"kiosk_electoric_charge/gosrc/ocpp_db_handler"
@@ -26,6 +31,7 @@ import (
 	"kiosk_electoric_charge/gosrc/structs"
 	"kiosk_electoric_charge/gosrc/updateapk"
 
+	// "github.com/rs/cors"
 	"go.uber.org/zap"
 )
 
@@ -57,65 +63,65 @@ func get_pay_DB() float64 {
 }
 
 // 광고 리스트 반환 db
-func get_ADlist_DB(device_id string) []structs.ST_AD {
-	var r []structs.ST_AD
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
+// func get_ADlist_DB(device_id string) []structs.ST_AD {
+// 	var r []structs.ST_AD
+// 	// dbname := os.Getenv("DBNAME")
+// 	// dbdata := os.Getenv("DBDATA")
 
-	// conn, err := sql.Open(dbname, dbdata)
+// 	// conn, err := sql.Open(dbname, dbdata)
 
-	conn, err := db.OpenDB()
-	if err != nil {
-		log.Printf(" get_pay_Handler : %s", err)
-	}
+// 	conn, err := db.OpenDB()
+// 	if err != nil {
+// 		log.Printf(" get_pay_Handler : %s", err)
+// 	}
 
-	rows, err := conn.Query("SELECT ad_id FROM device_ad WHERE d_id = ?", device_id)
+// 	rows, err := conn.Query("SELECT ad_id FROM device_ad WHERE d_id = ?", device_id)
 
-	if err != nil {
-		fmt.Printf("get_ADlist_DB func : %s", err)
-	}
+// 	if err != nil {
+// 		fmt.Printf("get_ADlist_DB func : %s", err)
+// 	}
 
-	for rows.Next() {
-		var ad_id string
-		rows.Scan(&ad_id)
+// 	for rows.Next() {
+// 		var ad_id string
+// 		rows.Scan(&ad_id)
 
-		s := structs.ST_AD{ADId: ad_id}
-		r = append(r, s)
-	}
+// 		s := structs.ST_AD{ADId: ad_id}
+// 		r = append(r, s)
+// 	}
 
-	defer rows.Close()
-	defer conn.Close()
+// 	defer rows.Close()
+// 	defer conn.Close()
 
-	return r
+// 	return r
 
-}
+// }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
 // 광고 다운 핸들러
-func access_ad_Handler(w http.ResponseWriter, r *http.Request) {
+// func access_ad_Handler(w http.ResponseWriter, r *http.Request) {
 
-	a_id := r.PostFormValue("ad_id")
-	log.Printf("access %s", a_id)
+// 	a_id := r.PostFormValue("ad_id")
+// 	log.Printf("access %s", a_id)
 
-	http.ServeFile(w, r, "./advertisement/"+a_id)
-}
+// 	http.ServeFile(w, r, "./advertisement/"+a_id)
+// }
 
 // 광고 리스트 반환 핸들러
-func get_ad_Handler(w http.ResponseWriter, r *http.Request) {
-	a_id := r.PostFormValue("device_id")
+// func get_ad_Handler(w http.ResponseWriter, r *http.Request) {
+// 	a_id := r.PostFormValue("device_id")
 
-	log.Printf("id = %s", a_id)
+// 	log.Printf("id = %s", a_id)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	data, _ := json.Marshal(get_ADlist_DB(a_id))
+// 	w.Header().Set("Content-Type", "application/json")
+// 	w.WriteHeader(http.StatusOK)
+// 	data, _ := json.Marshal(get_ADlist_DB(a_id))
 
-	log.Printf("list = %s", get_ADlist_DB(a_id))
+// 	log.Printf("list = %s", get_ADlist_DB(a_id))
 
-	fmt.Fprint(w, string(data))
+// 	fmt.Fprint(w, string(data))
 
-}
+// }
 
 // 가격 반환 핸들러
 func get_pay_Handler(w http.ResponseWriter, r *http.Request) {
@@ -124,18 +130,6 @@ func get_pay_Handler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	data, _ := json.Marshal(structs.ST_GetPay{Pay: get_pay_DB()})
 	fmt.Fprint(w, string(data))
-}
-
-// 충전기 상태 정보
-func DeviceStateList_Page_Handler(w http.ResponseWriter, r *http.Request) {
-
-	log.Print("DeviceStateList_Page_Handler")
-
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.DeviceStateListPage{Items: adminpage.Device_state_list_select(ConnectedDeivceList_Handler())})
-	w.Write(json)
-
 }
 
 var logd *zap.SugaredLogger
@@ -384,6 +378,16 @@ func Command_Handler(w http.ResponseWriter, r *http.Request) {
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
+// HandlerFuncType은 파라미터를 받는 핸들러 함수의 타입입니다.	-- 대쉬보드, 상태정보등 현제 csms에 연결된 상태를 같이 반환해주기위해
+type HandlerFuncType func(http.ResponseWriter, *http.Request, []string)
+
+// withParam은 핸들러 함수에 파라미터를 추가해서 넘기는 래퍼 함수입니다.
+func withParam(handler HandlerFuncType, param []string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		handler(w, r, param) // 파라미터를 추가하여 핸들러 함수를 호출합니다.
+	}
+}
+
 func main() {
 
 	err := godotenv.Load("./info.env")
@@ -441,7 +445,7 @@ func main() {
 	// GetDiagnostics
 	// UpdateFirmware
 
-	go csms.Start("0.0.0.0:8999", "/ws/", nil)
+	go csms.Start(os.Getenv("CSMSSERVER"), os.Getenv("CSMSSERVER_PATH"), nil)
 
 	//연결이 되어 있는지 확인
 	// log.Printf("aa : %s", strconv.FormatBool(csms.IsConnected("device_01")))
@@ -450,6 +454,8 @@ func main() {
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
 	mux := mux.NewRouter()
+
+	// mux.Use(accessControlMiddleware)
 	// mux := pat.New()
 	// mux.Get("/ws", wsHandler)
 
@@ -463,34 +469,40 @@ func main() {
 	// mux.Path("/").HandlerFunc(adminpage.LoginPage_Handler)
 
 	mux.Path("/login").HandlerFunc(adminpage.Login_Handler).Methods("POST")
+
+	privateRouter := mux.PathPrefix("/").Subrouter()
+	privateRouter.Use(jwtMiddleware)
+
 	// mux.Path("/login").HandlerFunc(Command_Handler)
+	//대쉬보드
+	privateRouter.Path("/dashboardlist").HandlerFunc(withParam(adminpage.Dashboard_Page_Handler, ConnectedDeivceList_Handler())).Methods("GET")
 	//충전기 위치 정보
-	mux.Path("/maplist").HandlerFunc(adminpage.MapList_Page_Handler).Methods("GET")
+	privateRouter.Path("/maplist").HandlerFunc(adminpage.MapList_Page_Handler).Methods("GET")
 	//충전기 설치 정보
-	mux.Path("/devicelist").HandlerFunc(adminpage.DeviceList_Page_Handler).Methods("GET")
+	privateRouter.Path("/devicelist").HandlerFunc(adminpage.DeviceList_Page_Handler).Methods("GET")
 	//충전기 상태 정보
-	mux.Path("/devicestatelist").HandlerFunc(DeviceStateList_Page_Handler).Methods("GET")
+	privateRouter.Path("/devicestatelist").HandlerFunc(withParam(adminpage.DeviceStateList_Page_Handler, ConnectedDeivceList_Handler())).Methods("GET")
 	//충전요금 단가 관리
-	mux.Path("/pricemng").HandlerFunc(adminpage.Pricemng_Page_Handler).Methods("GET")
+	privateRouter.Path("/pricemng").HandlerFunc(adminpage.Pricemng_Page_Handler).Methods("GET")
 	//충전기 업데이트
-	mux.Path("/deviceupdatelist").HandlerFunc(adminpage.Updatemng_Page_Handler).Methods("GET")
+	privateRouter.Path("/deviceupdatelist").HandlerFunc(adminpage.Updatemng_Page_Handler).Methods("GET")
 	//진단파일 요청 관리
-	mux.Path("/devicelogcmdpage").HandlerFunc(adminpage.Logmng_Page_Handler).Methods("GET")
+	privateRouter.Path("/devicelogcmdpage").HandlerFunc(adminpage.Logmng_Page_Handler).Methods("GET")
 	//충전량 및 이력조회
-	mux.Path("/chargelist").HandlerFunc(adminpage.Chargelist_Page_Handler).Methods("GET")
+	privateRouter.Path("/chargelist").HandlerFunc(adminpage.Chargelist_Page_Handler).Methods("GET")
 	//일자별 충전량 조회
-	mux.Path("/chargedailylist").HandlerFunc(adminpage.ChargeDailylist_Page_Handler).Methods("GET")
+	privateRouter.Path("/chargedailylist").HandlerFunc(adminpage.ChargeDailylist_Page_Handler).Methods("GET")
 	//충전기 그래프 조회
-	mux.Path("/chargedailygraph").HandlerFunc(adminpage.ChargeDailyGraph_Page_Handler).Methods("POST")
+	privateRouter.Path("/chargedailygraph").HandlerFunc(adminpage.ChargeDailyGraph_Page_Handler).Methods("POST")
 	//충전기 장애 이력
-	mux.Path("/errlist").HandlerFunc(adminpage.Errlist_Page_Handler).Methods("GET")
+	privateRouter.Path("/errlist").HandlerFunc(adminpage.Errlist_Page_Handler).Methods("GET")
 	// log.Printf("list : %v", adminpage.Charge_list_select())
 
 	//소프트웨어 업데이트 관리
 	// mux.Path("/swmng").HandlerFunc(adminpage.Swmng_Page_Handler)
 	//광고물 관리
 	//충전기별 광고 관리
-	mux.Path("/admng").HandlerFunc(adminpage.Admng_Page_Handler)
+	privateRouter.Path("/admng").HandlerFunc(adminpage.Admng_Page_Handler)
 
 	//매출실적 및 정산 조회
 	//사용자 관리/권한
@@ -499,61 +511,61 @@ func main() {
 	//////////////////////////////////관리자페이지 기능///////////////////////////////////
 
 	//기기 등록
-	mux.Path("/device/register").HandlerFunc(adminpage.Register_Device_Handler)
+	privateRouter.Path("/device/register").HandlerFunc(adminpage.Register_Device_Handler).Methods("POST")
 	//기기 수정
-	mux.Path("/device/updater").HandlerFunc(adminpage.Updater_Device_Handler)
+	privateRouter.Path("/device/updater").HandlerFunc(adminpage.Updater_Device_Handler).Methods("POST")
 	//기기 삭제
-	mux.Path("/device/deleter").HandlerFunc(adminpage.Deleter_Device_Handler)
+	privateRouter.Path("/device/deleter").HandlerFunc(adminpage.Deleter_Device_Handler).Methods("POST")
 
 	//단가 등록
-	mux.Path("/price/register").HandlerFunc(adminpage.Register_Price_Handler)
+	privateRouter.Path("/price/register").HandlerFunc(adminpage.Register_Price_Handler).Methods("POST")
 	//단가 삭제
-	mux.Path("/price/deleter").HandlerFunc(adminpage.Deleter_Price_Handler)
+	privateRouter.Path("/price/deleter").HandlerFunc(adminpage.Deleter_Price_Handler).Methods("POST")
 
 	//기기 조회
 	// mux.Path("/device/selecter").HandlerFunc(adminpage.Selecter_Device_Handler)
 
-	//광고업로드
-	mux.Path("/upload/ad").HandlerFunc(adminpage.Errlist_Page_Handler)
-	//apk업로드
-	mux.Path("/upload/apk").HandlerFunc(adminpage.Errlist_Page_Handler)
+	// //광고업로드
+	// mux.Path("/upload/ad").HandlerFunc(adminpage.Errlist_Page_Handler)
+	// //apk업로드
+	// mux.Path("/upload/apk").HandlerFunc(adminpage.Errlist_Page_Handler)
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 	// 정보값 db
 
 	//결제정보
-	mux.Path("/pay/history").HandlerFunc(payinfo.Set_Pay_Handler).Methods("POST")
+	privateRouter.Path("/pay/history").HandlerFunc(payinfo.Set_Pay_Handler).Methods("POST")
 
 	//충전시작
-	mux.Path("/charging/start").HandlerFunc(payinfo.Set_charging_start_Handler).Methods("POST")
+	privateRouter.Path("/charging/start").HandlerFunc(payinfo.Set_charging_start_Handler).Methods("POST")
 
 	//충전종료
-	mux.Path("/charging/end").HandlerFunc(payinfo.Set_charging_end_Handler).Methods("POST")
+	privateRouter.Path("/charging/end").HandlerFunc(payinfo.Set_charging_end_Handler).Methods("POST")
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
 	//앱 업데이트
 
 	//버전 확인
-	mux.Path("/api/apk/version").HandlerFunc(updateapk.Get_apk_version_Handler).Methods("POST")
+	privateRouter.Path("/api/apk/version").HandlerFunc(updateapk.Get_apk_version_Handler).Methods("POST")
 
 	//앱 apk 파일 다운
-	mux.Path("/file/apk/operation/1").HandlerFunc(updateapk.App_apk_download_Handler).Methods("POST")
+	privateRouter.Path("/file/apk/operation/1").HandlerFunc(updateapk.App_apk_download_Handler).Methods("POST")
 
 	//앱 pole apk 파일 다운
-	mux.Path("/file/apk/operation/2").HandlerFunc(updateapk.App_pole_apk_download_Handler).Methods("POST")
+	privateRouter.Path("/file/apk/operation/2").HandlerFunc(updateapk.App_pole_apk_download_Handler).Methods("POST")
 
 	//앱 업데이트 완료
-	mux.Path("/file/apk/consequnce").HandlerFunc(updateapk.App_update_complete_Handler).Methods("POST")
+	privateRouter.Path("/file/apk/consequnce").HandlerFunc(updateapk.App_update_complete_Handler).Methods("POST")
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
 	//광고 리스트
-	mux.Path("/api/ad").HandlerFunc(get_ad_Handler).Methods("POST")
+	// mux.Path("/api/ad").HandlerFunc(get_ad_Handler).Methods("POST")
 
-	//광고 접근 후 다운
-	//경로끝에 /를 붙여줘야 html상에서 보임
-	mux.Path("/file/ad").HandlerFunc(access_ad_Handler).Methods("POST")
+	// //광고 접근 후 다운
+	// //경로끝에 /를 붙여줘야 html상에서 보임
+	// mux.Path("/file/ad").HandlerFunc(access_ad_Handler).Methods("POST")
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -563,7 +575,7 @@ func main() {
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
 	//가격 리턴
-	mux.Path("/api/pay").HandlerFunc(get_pay_Handler).Methods("POST")
+	privateRouter.Path("/api/pay").HandlerFunc(get_pay_Handler).Methods("POST")
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -571,50 +583,78 @@ func main() {
 	// mux.Path("/command/cdl").HandlerFunc(ConnectedDeivceList_Handler).Methods("POST")
 
 	//원격 시작
-	mux.Path("/command/rmstt").HandlerFunc(RemoteStartTransaction_Handler).Methods("POST")
+	privateRouter.Path("/command/rmstt").HandlerFunc(RemoteStartTransaction_Handler).Methods("POST")
 
 	//원격 멈춤
-	mux.Path("/command/rmstp").HandlerFunc(RemoteStopTransaction_Handler).Methods("POST")
+	privateRouter.Path("/command/rmstp").HandlerFunc(RemoteStopTransaction_Handler).Methods("POST")
 
 	//기기 사용 가능 설정
 	// mux.Path("/command/abdc").HandlerFunc(AbledDevice_Handler).Methods("POST")
 
 	//캐쉬 삭제
-	mux.Path("/command/cc").HandlerFunc(ClearCache_Handler).Methods("POST")
+	privateRouter.Path("/command/cc").HandlerFunc(ClearCache_Handler).Methods("POST")
 
 	//커넥터 사용 가능 설정
-	mux.Path("/command/cgab").HandlerFunc(ChangeAvailability_Handler).Methods("POST")
+	privateRouter.Path("/command/cgab").HandlerFunc(ChangeAvailability_Handler).Methods("POST")
 
 	//커넥터 해체
 
 	//리셋
-	mux.Path("/command/rs").HandlerFunc(Reset_Handler).Methods("POST")
+	privateRouter.Path("/command/rs").HandlerFunc(Reset_Handler).Methods("POST")
 
 	//기기 설정값 리턴
-	mux.Path("/command/gcfr").HandlerFunc(GetConfiguration_Handler).Methods("POST")
+	privateRouter.Path("/command/gcfr").HandlerFunc(GetConfiguration_Handler).Methods("POST")
 
 	//기기 설정값 설정
-	mux.Path("/command/ccfr").HandlerFunc(ChangeConfiguration_Handler).Methods("POST")
+	privateRouter.Path("/command/ccfr").HandlerFunc(ChangeConfiguration_Handler).Methods("POST")
 
 	//nvcat 설정
-	mux.Path("/command/ncs").HandlerFunc(NVCAT_Setting_Handler).Methods("POST")
+	privateRouter.Path("/command/ncs").HandlerFunc(NVCAT_Setting_Handler).Methods("POST")
 
 	//nvcat 재시작
-	mux.Path("/command/ncrs").HandlerFunc(NVCAT_Restart_Handler).Methods("POST")
+	privateRouter.Path("/command/ncrs").HandlerFunc(NVCAT_Restart_Handler).Methods("POST")
+
+	//nvcat 부분취소
+	privateRouter.Path("/command/nccp").HandlerFunc(NVCAT_CanclePay_Handler).Methods("POST")
 
 	//소프트웨어 업데이트
-	mux.Path("/command/udfw").HandlerFunc(UpdateFirmware_Handler).Methods("POST")
+	privateRouter.Path("/command/udfw").HandlerFunc(UpdateFirmware_Handler).Methods("POST")
 
 	//기기 메시지 트리거
-	mux.Path("/command/tgmg").HandlerFunc(TriggerMessage_Handler).Methods("POST")
+	privateRouter.Path("/command/tgmg").HandlerFunc(TriggerMessage_Handler).Methods("POST")
 
 	//로그 읽어오기
-	mux.Path("/command/gdns").HandlerFunc(GetDiagnostics_Handler).Methods("POST")
+	privateRouter.Path("/command/gdns").HandlerFunc(GetDiagnostics_Handler).Methods("POST")
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
+	// corsOpts := cors.New(cors.Options{
+	// 	AllowedOrigins: []string{"http://localhost:5005"}, //you service is available and allowed for this base url
+	// 	AllowedMethods: []string{
+	// 		http.MethodGet, //http methods for your app
+	// 		http.MethodPost,
+	// 		// http.MethodPut,
+	// 		// http.MethodPatch,
+	// 		// http.MethodDelete,
+	// 		// http.MethodOptions,
+	// 		// http.MethodHead,
+	// 	},
+	// 	AllowCredentials: true,
+	// 	AllowedHeaders:   []string{"Accept", "Accept-Language", "Content-Type", "Content-Language", "application/json"},
+
+	// 	// AllowedHeaders: []string{
+	// 	// 	"*", //or you can your header key values which you are using in your application
+	// 	// },
+	// })
+
+	// muxhandler := corsOpts.Handler(mux)
+
+	muxhandler := accessControlMiddleware(mux)
+
 	// n.UseHandler(mux)
-	http.ListenAndServe(":8099", mux)
+	http.ListenAndServe(os.Getenv("HTTPSERVER"), muxhandler)
+
+	// http.ListenAndServe(":8099", mux)
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -673,6 +713,80 @@ func main() {
 	//////////////////////////////////////////////////////////////////////////////////////////////
 }
 
+func jwtMiddleware(next http.Handler) http.Handler {
+
+	// log.Print("jwtMiddleware")
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenString := r.Header.Get("Authorization")
+		if tokenString == "" {
+			// log.Print("jwtMiddleware 1")
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		tokenString = strings.Replace(tokenString, "Bearer ", "", 1)
+
+		token, err := adminjwt.ParseToken(tokenString)
+		if err != nil {
+			// log.Print("jwtMiddleware 2")
+			fmt.Println("Error parsing token")
+			//유효기간 시간 초과시
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		if err != nil {
+			// log.Print("jwtMiddleware 3")
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		if !token.Valid {
+			// log.Print("jwtMiddleware 4")
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			// log.Print("jwtMiddleware 5")
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		userID, ok := claims["user"].(string)
+		if !ok {
+			// log.Print("jwtMiddleware 6")
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		// log.Print("jwtMiddleware 7")
+		ctx := context.WithValue(r.Context(), structs.ContextStruct{}, userID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func accessControlMiddleware(next http.Handler) http.Handler {
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5005")
+		// w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS,PUT")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST")
+		w.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type ,application/json")
+
+		if r.Method == "OPTIONS" {
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 func SetCheckOriginHanler_H(r *http.Request) bool {
 	// log.Printf("SetCheckOriginHanler %v	\n", r)
 	log.Println("SetCheckOriginHanler")
@@ -683,6 +797,7 @@ func SetCheckOriginHanler_H(r *http.Request) bool {
 
 	log.Printf("access : %v", r.Header)
 	log.Printf("access : %v", r.Host)
+
 	return true
 }
 
@@ -1038,7 +1153,7 @@ func StatusNotificationHanler(cp *ChargePoint, p Payload) Payload {
 
 	ocpp_db_handler.StatusNotification_update(cp.Id, req.ConnectorId, req.ErrorCode, req.Status, req.VendorId, req.VendorErrorCode, req.Info, req.Timestamp)
 	//만약 에러코드가 존재하면 에러테이블에 저장하기
-	if req.ErrorCode != "NoError" || req.VendorId != "" || req.Info != "" {
+	if req.ErrorCode != "NoError" || strings.Trim(req.VendorId, " ") != "" || strings.Trim(req.Info, " ") != "" {
 		ocpp_db_handler.Device_Error_insert(cp.Id, req.ErrorCode, req.VendorId, req.VendorErrorCode, req.Info)
 	}
 
@@ -1542,6 +1657,51 @@ func NVCAT_Restart_Handler(w http.ResponseWriter, r *http.Request) {
 			var req Payload = v16.DataTransferReq{ //nvcat 재시작 - 뭔가 오류났을때
 				VendorId:  msg.VendorId,
 				MessageId: msg.MessageId,
+			}
+			res, err := cp.Call("DataTransfer", req)
+			if err != nil {
+				log.Printf("aa %s", err)
+			}
+			log.Print(res)
+
+			returnValue = res.(*v16.DataTransferConf)
+		}
+
+		if cp == nil {
+			log.Print("cp is nil")
+			returnValue = &v16.DataTransferConf{}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(returnValue)
+}
+
+// nvcat 부분취소
+func NVCAT_CanclePay_Handler(w http.ResponseWriter, r *http.Request) {
+
+	id := r.Header.Get("Id")
+	msg := v16.DataTransferReq{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&msg)
+	if err != nil {
+		log.Printf("NVCAT_CanclePay_Handler err : %s", err)
+		return
+	}
+	defer r.Body.Close()
+
+	log.Printf("NVCAT_CanclePay_Handler msg : %v", msg)
+	var returnValue *v16.DataTransferConf
+
+	if csms != nil {
+		cp, b := csms.Load(id)
+		if b {
+
+			var req Payload = v16.DataTransferReq{ //nvcat 부분취소
+				VendorId:  msg.VendorId,
+				MessageId: msg.MessageId,
+				Data:      msg.Data,
 			}
 			res, err := cp.Call("DataTransfer", req)
 			if err != nil {
