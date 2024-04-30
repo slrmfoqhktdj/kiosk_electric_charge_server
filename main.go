@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 
 	// "io"
@@ -25,6 +26,7 @@ import (
 
 	"kiosk_electoric_charge/gosrc/adminjwt"
 	"kiosk_electoric_charge/gosrc/adminpage"
+	"kiosk_electoric_charge/gosrc/adminpagedbconn"
 	"kiosk_electoric_charge/gosrc/db"
 	"kiosk_electoric_charge/gosrc/ocpp_db_handler"
 	"kiosk_electoric_charge/gosrc/payinfo"
@@ -378,14 +380,65 @@ func Command_Handler(w http.ResponseWriter, r *http.Request) {
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-// HandlerFuncType은 파라미터를 받는 핸들러 함수의 타입입니다.	-- 대쉬보드, 상태정보등 현제 csms에 연결된 상태를 같이 반환해주기위해
-type HandlerFuncType func(http.ResponseWriter, *http.Request, []string)
+// 대쉬보드 정보
+func Dashboard_Page_Handler(w http.ResponseWriter, r *http.Request) {
 
-// withParam은 핸들러 함수에 파라미터를 추가해서 넘기는 래퍼 함수입니다.
-func withParam(handler HandlerFuncType, param []string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		handler(w, r, param) // 파라미터를 추가하여 핸들러 함수를 호출합니다.
+	log.Print("Dashboard_Page_Handler")
+
+	// 한국 시간대 로드
+	loc, err := time.LoadLocation("Asia/Seoul")
+	if err != nil {
+		fmt.Println("시간대 로딩 에러:", err)
+		return
 	}
+
+	// 현재 시간을 한국 시간대로 설정
+	now := time.Now().In(loc)
+
+	Device_Id := "전체"
+	StartTime := fmt.Sprintf("%s %s", now.AddDate(0, 0, -3).Format("2006-01-02"), "00:00:00")
+	EndTime := fmt.Sprintf("%s %s", now.Format("2006-01-02"), "23:59:59")
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json, _ := json.Marshal(&structs.DashboardPage{List: adminpagedbconn.Device_list_select("0", "3"), State: adminpagedbconn.Device_state_list_select(ConnectedDeivceList_Handler(), "0", "3"), Price: adminpagedbconn.Price_list_select("0", "3"), Daily: adminpagedbconn.Charge_daily_list_select("0", "4"), Maps: adminpagedbconn.Map_list_select(), Graph: adminpagedbconn.Charge_daily_graph_select(StartTime, EndTime, Device_Id)})
+	w.Write(json)
+}
+
+// 기기 상태 정보
+func DeviceStateList_Page_Handler(w http.ResponseWriter, r *http.Request) {
+
+	log.Printf("DeviceStateList_Page_Handler %v,%v", r.URL.Query().Get("s_order"), r.URL.Query().Get("e_order"))
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json, _ := json.Marshal(&structs.DeviceStateListPage{Count: adminpagedbconn.DeviceState_list_count_select(), Items: adminpagedbconn.Device_state_list_select(ConnectedDeivceList_Handler(), r.URL.Query().Get("s_order"), r.URL.Query().Get("e_order"))})
+	w.Write(json)
+}
+
+// 기기 상태 정보 검색
+func DeviceStateList_Page_Search_Handler(w http.ResponseWriter, r *http.Request) {
+
+	log.Printf("DeviceStateList_Page_Search_Handler %v,%v", r.URL.Query().Get("column"), r.URL.Query().Get("data"))
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json, _ := json.Marshal(&structs.DeviceStateListPage{Items: adminpagedbconn.Device_state_list_select_search(ConnectedDeivceList_Handler(), r.URL.Query().Get("column"), r.URL.Query().Get("data"))})
+	w.Write(json)
+}
+
+// 원격 연결되어있는 기기 리스트 반환
+func ConnectedDeivceList_Handler() []string {
+
+	var returnValue []string
+
+	for k := range csms.chargepoints {
+		// log.Printf("csms.chargepoints ----- key = %v \n", k)
+
+		returnValue = append(returnValue, k)
+	}
+
+	return returnValue
 }
 
 func main() {
@@ -395,6 +448,8 @@ func main() {
 		log.Println(err)
 		return
 	}
+
+	runtime.NumCPU() // 실행 환경의 물리적 CPU 최대 개수로 설정된다.
 
 	//랜덤값 기준시드 정해주기
 	rand.Seed(time.Now().UnixNano())
@@ -475,13 +530,13 @@ func main() {
 
 	// mux.Path("/login").HandlerFunc(Command_Handler)
 	//대쉬보드
-	privateRouter.Path("/dashboardlist").HandlerFunc(withParam(adminpage.Dashboard_Page_Handler, ConnectedDeivceList_Handler())).Methods("GET")
+	privateRouter.Path("/dashboardlist").HandlerFunc(Dashboard_Page_Handler).Methods("GET")
 	//충전기 위치 정보
 	privateRouter.Path("/maplist").HandlerFunc(adminpage.MapList_Page_Handler).Methods("GET")
 	//충전기 설치 정보
 	privateRouter.Path("/devicelist").HandlerFunc(adminpage.DeviceList_Page_Handler).Methods("GET")
 	//충전기 상태 정보
-	privateRouter.Path("/devicestatelist").HandlerFunc(withParam(adminpage.DeviceStateList_Page_Handler, ConnectedDeivceList_Handler())).Methods("GET")
+	privateRouter.Path("/devicestatelist").HandlerFunc(DeviceStateList_Page_Handler).Methods("GET")
 	//충전요금 단가 관리
 	privateRouter.Path("/pricemng").HandlerFunc(adminpage.Pricemng_Page_Handler).Methods("GET")
 	//충전기 업데이트
@@ -496,7 +551,6 @@ func main() {
 	privateRouter.Path("/chargedailygraph").HandlerFunc(adminpage.ChargeDailyGraph_Page_Handler).Methods("POST")
 	//충전기 장애 이력
 	privateRouter.Path("/errlist").HandlerFunc(adminpage.Errlist_Page_Handler).Methods("GET")
-	// log.Printf("list : %v", adminpage.Charge_list_select())
 
 	//소프트웨어 업데이트 관리
 	// mux.Path("/swmng").HandlerFunc(adminpage.Swmng_Page_Handler)
@@ -507,6 +561,25 @@ func main() {
 	//매출실적 및 정산 조회
 	//사용자 관리/권한
 	//공통코드
+
+	//////////////////////////////////관리자페이지 검색///////////////////////////////////
+
+	//충전기 설치 정보 검색
+	privateRouter.Path("/devicelist/search").HandlerFunc(adminpage.DeviceList_Page_Search_Handler).Methods("GET")
+	//충전기 상태 정보 검색
+	privateRouter.Path("/devicestatelist/search").HandlerFunc(DeviceStateList_Page_Search_Handler).Methods("GET")
+	//충전요금 단가 관리 검색
+	privateRouter.Path("/pricemng/search").HandlerFunc(adminpage.Pricemng_Page_Search_Handler).Methods("GET")
+	//충전기 업데이트 검색
+	privateRouter.Path("/deviceupdatelist/search").HandlerFunc(adminpage.Updatemng_Page_Search_Handler).Methods("GET")
+	//진단파일 요청 관리 검색
+	privateRouter.Path("/devicelogcmdpage/search").HandlerFunc(adminpage.Logmng_Page_Search_Handler).Methods("GET")
+	//충전량 및 이력조회 검색
+	privateRouter.Path("/chargelist/search").HandlerFunc(adminpage.Chargelist_Page_Search_Handler).Methods("GET")
+	//일자별 충전량 검색
+	privateRouter.Path("/chargedailylist/search").HandlerFunc(adminpage.ChargeDailylist_Page_Search_Handler).Methods("GET")
+	//충전기 장애 이력 검색
+	privateRouter.Path("/errlist/search").HandlerFunc(adminpage.Errlist_Page_Search_Handler).Methods("GET")
 
 	//////////////////////////////////관리자페이지 기능///////////////////////////////////
 
@@ -713,6 +786,20 @@ func main() {
 	//////////////////////////////////////////////////////////////////////////////////////////////
 }
 
+// // HandlerFuncType은 파라미터를 받는 핸들러 함수의 타입입니다.	-- 대쉬보드, 상태정보등 현제 csms에 연결된 상태를 같이 반환해주기위해
+// type HandlerFuncType func(http.ResponseWriter, *http.Request, []string)
+
+// // withParam은 핸들러 함수에 파라미터를 추가해서 넘기는 래퍼 함수입니다.
+// func withParam(handler HandlerFuncType, param []string) http.HandlerFunc {
+
+// 	aa := param
+// 	log.Printf("params : %v", aa)
+
+// 	return func(w http.ResponseWriter, r *http.Request) {
+// 		handler(w, r, param) // 파라미터를 추가하여 핸들러 함수를 호출합니다.
+// 	}
+// }
+
 func jwtMiddleware(next http.Handler) http.Handler {
 
 	// log.Print("jwtMiddleware")
@@ -791,11 +878,11 @@ func SetCheckOriginHanler_H(r *http.Request) bool {
 	// log.Printf("SetCheckOriginHanler %v	\n", r)
 	log.Println("SetCheckOriginHanler")
 
-	for k, v := range csms.chargepoints {
-		log.Printf("csms.chargepoints ----- key = %v , value = %v \n", k, v)
-	}
+	// for k, v := range csms.chargepoints {
+	// 	log.Printf("csms.chargepoints ----- key = %v , value = %v \n", k, v)
+	// }
 
-	log.Printf("access : %v", r.Header)
+	// log.Printf("access : %v", r.Header)
 	log.Printf("access : %v", r.Host)
 
 	return true
@@ -959,15 +1046,6 @@ func StartTransactionHandler(cp *ChargePoint, p Payload) Payload {
 	return res
 
 }
-
-// type StopTransactionRequestTT struct {
-// 	IdTag           string           `json:"idTag,omitempty" validate:"omitempty,max=20"`
-// 	MeterStop       int              `json:"meterStop" validate:"required,gte=0"`
-// 	Timestamp       string           `json:"timestamp" validate:"required,dateTime"`
-// 	TransactionId   int              `json:"transactionId" validate:"required"`
-// 	Reason          string           `json:"reason,omitempty" validate:"omitempty,reason"`
-// 	TransactionData []v16.MeterValue `json:"transactionData,omitempty" validate:"omitempty,dive"`
-// }
 
 func StopTransactionHandler(cp *ChargePoint, p Payload) Payload {
 	log.Print("StopTransactionHandler")
@@ -1198,22 +1276,6 @@ type AbledDeviceConf struct {
 // type ConnctedDevice struct {
 // 	Id string `json:"id"`
 // }
-
-// 원격 연결되어있는 기기 리스트 반환
-func ConnectedDeivceList_Handler() []string {
-
-	var returnValue []string
-
-	for k := range csms.chargepoints {
-		// log.Printf("csms.chargepoints ----- key = %v , value = %v \n", k, v)
-		log.Printf("csms.chargepoints ----- key = %v \n", k)
-		// a := ConnctedDevice{Id: k}
-
-		returnValue = append(returnValue, k)
-	}
-
-	return returnValue
-}
 
 // 원격 시작 핸들러
 func RemoteStartTransaction_Handler(w http.ResponseWriter, r *http.Request) {

@@ -55,30 +55,37 @@ type MapListPage struct { // 충전기 위치정보 페이지
 }
 
 type DeviceListPage struct { // 충전기 설치정보 페이지
+	Count int              `json:"count"`
 	Items []DeviceListItem `json:"item"`
 }
 
 type DeviceStateListPage struct { // 충전기 상태정보 페이지
+	Count int                   `json:"count"`
 	Items []DeviceStateListItem `json:"item"`
 }
 
 type PricemngPage struct { // 충전요금 단가 관리 페이지
+	Count int             `json:"count"`
 	Items []PriceListItem `json:"item"`
 }
 
 type UpdatemngPage struct { // 업데이트 관리 페이지
+	Count int                    `json:"count"`
 	Items []DeviceUpdateListItem `json:"item"`
 }
 
 type LogmngPage struct { // 로그 관리 페이지
+	Count int                 `json:"count"`
 	Items []DeviceLogListItem `json:"item"`
 }
 
 type ChargeListPage struct { // 충전량 및 이력조회 관리 페이지
+	Count int              `json:"count"`
 	Items []ChargeListItem `json:"item"`
 }
 
 type ChargeDailyListPage struct { // 일자별 충전량 조회 페이지
+	Count int                   `json:"count"`
 	Items []ChargeDailyListItem `json:"item"`
 }
 
@@ -88,6 +95,7 @@ type ChargeDailyGraphPage struct { // 충전기 그래프 조회 페이지
 }
 
 type ErrListPage struct { // 충전기 장애 이력 관리 페이지
+	Count int           `json:"count"`
 	Items []ErrListItem `json:"item"`
 }
 

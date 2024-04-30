@@ -8,20 +8,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
+
+	// "time"
 
 	// _ "github.com/go-sql-driver/mysql"
 
 	"text/template"
 
-	"kiosk_electoric_charge/gosrc/adminjwt"
-	"kiosk_electoric_charge/gosrc/db"
+	"kiosk_electoric_charge/gosrc/adminpagedbconn"
 	"kiosk_electoric_charge/gosrc/structs"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
-// html 구획 나누기
+// // html 구획 나누기
 var templ = func() *template.Template {
 
 	//template 에 function 넣기
@@ -50,611 +48,6 @@ var templ = func() *template.Template {
 	return t
 }()
 
-func contains(s []string, str string) bool {
-	for _, v := range s {
-		if v == str {
-			return true
-		}
-	}
-
-	return false
-}
-
-// 로그인
-func Login_select(email string, pwd string) structs.LoginDataForm {
-	var result structs.LoginDataForm
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
-
-	// conn, err := sql.Open(dbname, dbdata)
-
-	var Email string
-	var Name string
-	var Password string
-
-	conn, err := db.OpenDB()
-	if err != nil {
-		log.Printf(" Login_select db err : %s", err)
-	}
-
-	if err := conn.QueryRow("SELECT email,name,password FROM admin_user WHERE email = ?", email).Scan(&Email, &Name, &Password); err != nil {
-		log.Printf("select user, %v", err)
-		return result
-	}
-
-	// 암호화
-	// hashedPassword, err := bcrypt.GenerateFromPassword([]byte(pwd), 11) // 10 means difficulty
-	// if err != nil {
-	// 	log.Printf("failed to GenerateFromPassword: %v", err)
-	// 	return result
-	// }
-
-	if err := bcrypt.CompareHashAndPassword([]byte(Password), []byte(pwd)); err != nil {
-		log.Printf("incorrect password, %v", err)
-		return result
-	}
-
-	tokenString, err := adminjwt.GenerateToken(Name)
-	if err != nil {
-		return result
-	}
-
-	log.Printf("key is %v", tokenString)
-
-	result = structs.LoginDataForm{Email: Email, Name: tokenString}
-
-	defer conn.Close()
-
-	return result
-}
-
-// 충전기 위치 정보
-func map_list_select() []structs.MapListItem {
-	var result []structs.MapListItem
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
-
-	// conn, err := sql.Open(dbname, dbdata)
-
-	conn, err := db.OpenDB()
-	if err != nil {
-		log.Printf(" User_survey_a err : %s", err)
-	}
-
-	rows, err := conn.Query("SELECT id,latitude,longitude,addr FROM device")
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	for rows.Next() {
-		var Id string
-		var Latitude string
-		var Longitude string
-		var Addr string
-
-		rows.Scan(&Id, &Latitude, &Longitude, &Addr)
-
-		d := structs.MapListPositionItem{Latitude: Latitude, Longitude: Longitude}
-
-		m := structs.MapListItem{Id: Id, Position: d, Addr: Addr}
-		result = append(result, m)
-	}
-	defer rows.Close()
-	defer conn.Close()
-
-	return result
-}
-
-// 충전기 설치 정보
-func device_list_select() []structs.DeviceListItem {
-	var result []structs.DeviceListItem
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
-
-	// conn, err := sql.Open(dbname, dbdata)
-
-	conn, err := db.OpenDB()
-	if err != nil {
-		log.Printf(" User_survey_a err : %s", err)
-	}
-
-	rows, err := conn.Query("SELECT * FROM device")
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	for rows.Next() {
-		var Id string
-		var Latitude string
-		var Longitude string
-		var Addr string
-		var S_Version string
-		var H_C_M string
-		var H_P_M string
-		var H_B_M string
-		var H_W_M string
-		var I_Time string
-		var U_Time string
-		var Enabled string
-
-		rows.Scan(&Id, &Latitude, &Longitude, &Addr, &S_Version, &H_C_M, &H_P_M, &H_B_M, &H_W_M, &I_Time, &U_Time, &Enabled)
-
-		m := structs.DeviceListItem{Id: Id, Latitude: Latitude, Longitude: Longitude, Addr: Addr, S_Version: S_Version, H_C_M: H_C_M, H_P_M: H_P_M, H_B_M: H_B_M, H_W_M: H_W_M, I_Time: I_Time, U_Time: U_Time, Enabled: Enabled}
-		result = append(result, m)
-	}
-	defer rows.Close()
-	defer conn.Close()
-
-	return result
-}
-
-// 충전기 상태 정보
-func device_state_list_select(dconn []string) []structs.DeviceStateListItem {
-	var result []structs.DeviceStateListItem
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
-
-	// conn, err := sql.Open(dbname, dbdata)
-
-	conn, err := db.OpenDB()
-	if err != nil {
-		log.Printf(" User_survey_a err : %s", err)
-	}
-
-	rows, err := conn.Query("SELECT * FROM device_status")
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	for rows.Next() {
-
-		var Id string
-		// var Conn    string
-		var State *string
-		var State_e *string
-		var V_Id *string
-		var V_Error *string
-		var E_Info *string
-		var U_Time *string
-		var F_State *string
-		var D_State *string
-
-		rows.Scan(&Id, &State, &State_e, &V_Id, &V_Error, &E_Info, &U_Time, &F_State, &D_State)
-
-		m := structs.DeviceStateListItem{Id: Id, Conn: contains(dconn, Id), State: State, State_e: State_e, V_Id: V_Id, V_Error: V_Error, E_Info: E_Info, U_Time: U_Time, F_State: F_State, D_State: D_State}
-		result = append(result, m)
-	}
-
-	defer rows.Close()
-	defer conn.Close()
-
-	return result
-}
-
-// 충전요금 단가 관리
-func price_list_select() []structs.PriceListItem {
-	var result []structs.PriceListItem
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
-
-	// conn, err := sql.Open(dbname, dbdata)
-
-	conn, err := db.OpenDB()
-	if err != nil {
-		log.Printf(" User_survey_a err : %s", err)
-	}
-
-	rows, err := conn.Query("SELECT * FROM e_price")
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	for rows.Next() {
-		var Id string
-		var Price string
-		var Time string
-		var Writer string
-
-		rows.Scan(&Id, &Price, &Time, &Writer)
-
-		m := structs.PriceListItem{Id: Id, Price: Price, Time: Time, Writer: Writer}
-		result = append(result, m)
-	}
-	defer rows.Close()
-	defer conn.Close()
-
-	return result
-}
-
-// 충전기 업데이트 리스트 정보
-func update_list_select() []structs.DeviceUpdateListItem {
-	var result []structs.DeviceUpdateListItem
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
-
-	// conn, err := sql.Open(dbname, dbdata)
-
-	conn, err := db.OpenDB()
-	if err != nil {
-		log.Printf(" User_survey_a err : %s", err)
-	}
-
-	rows, err := conn.Query("SELECT d.id, d.addr,d.s_version,s.f_state,d.i_time,d.u_time  FROM device AS d LEFT JOIN device_status AS s ON s.id = d.id")
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	for rows.Next() {
-		var Id string
-		var Addr string
-		var S_Version string
-		var F_State *string
-		var I_Time string
-		var U_Time string
-
-		rows.Scan(&Id, &Addr, &S_Version, &F_State, &I_Time, &U_Time)
-
-		m := structs.DeviceUpdateListItem{Id: Id, Addr: Addr, S_Version: S_Version, F_State: F_State, I_Time: I_Time, U_Time: U_Time}
-		result = append(result, m)
-	}
-	defer rows.Close()
-	defer conn.Close()
-
-	return result
-}
-
-// 충전기 로그 리스트 정보
-func Log_list_select() []structs.DeviceLogListItem {
-	var result []structs.DeviceLogListItem
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
-
-	// conn, err := sql.Open(dbname, dbdata)
-
-	conn, err := db.OpenDB()
-	if err != nil {
-		log.Printf(" User_survey_a err : %s", err)
-	}
-
-	rows, err := conn.Query("SELECT d.id, d.addr,s.d_state  FROM device AS d LEFT JOIN device_status AS s ON s.id = d.id")
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	for rows.Next() {
-		var Id string
-		var Addr string
-		var D_State *string
-
-		rows.Scan(&Id, &Addr, &D_State)
-
-		m := structs.DeviceLogListItem{Id: Id, Addr: Addr, D_State: D_State}
-		result = append(result, m)
-	}
-	defer rows.Close()
-	defer conn.Close()
-
-	return result
-}
-
-// 소프트웨어 업데이트 관리
-// func sw_list_select() []structs.SwListItem {
-// 	var result []structs.SwListItem
-// 	// dbname := os.Getenv("DBNAME")
-// 	// dbdata := os.Getenv("DBDATA")
-
-// 	// conn, err := sql.Open(dbname, dbdata)
-
-// 	conn, err := db.OpenDB()
-// 	if err != nil {
-// 		log.Printf(" User_survey_a err : %s", err)
-// 	}
-
-// 	rows, err := conn.Query("select id,version,time from app_vs")
-// 	if err != nil {
-// 		fmt.Println(err)
-// 		os.Exit(1)
-// 	}
-
-// 	for rows.Next() {
-// 		var Id string
-// 		var Version string
-// 		var Time string
-
-// 		rows.Scan(&Id, &Version, &Time)
-
-// 		m := structs.SwListItem{Id: Id, Version: Version, Time: Time}
-// 		result = append(result, m)
-// 	}
-// 	defer rows.Close()
-// 	defer conn.Close()
-
-// 	return result
-// }
-
-// 충전기별 광고 관리
-func ad_list_select() []structs.AdListItem {
-	var result []structs.AdListItem
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
-
-	// conn, err := sql.Open(dbname, dbdata)
-
-	conn, err := db.OpenDB()
-	if err != nil {
-		log.Printf(" User_survey_a err : %s", err)
-	}
-
-	rows, err := conn.Query("select d_id,ad_id,time from device_ad")
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	for rows.Next() {
-		var D_Id string
-		var AD_Id string
-		var Time string
-
-		rows.Scan(&D_Id, &AD_Id, &Time)
-
-		m := structs.AdListItem{D_Id: D_Id, AD_Id: AD_Id, Time: Time}
-		result = append(result, m)
-	}
-	defer rows.Close()
-	defer conn.Close()
-
-	return result
-}
-
-// 충전량 및 이력조회
-func charge_list_select() []structs.ChargeListItem {
-	var result []structs.ChargeListItem
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
-
-	// conn, err := sql.Open(dbname, dbdata)
-
-	conn, err := db.OpenDB()
-	if err != nil {
-		log.Printf(" User_survey_a err : %s", err)
-	}
-
-	rows, err := conn.Query("SELECT p.pay_num as payid, d_id,c_pay,can_pay,pay_by,c_num,c_c_num,pay_day,c_pay_day,c_conn,c_time,c_amount,c_time_s,c_time_e,c_time_u FROM charge_h as c RIGHT JOIN pay_h as p  ON c.c_id = p.pay_num")
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	for rows.Next() {
-		var Payid string
-		var D_id *string
-		var C_pay *string
-		var Can_pay *string
-		var Pay_by *string
-		var C_num *string
-		var C_c_num *string
-		var Pay_day *string
-		var C_pay_day *string
-		var C_conn *string
-		var C_time *string
-		var C_amount *string
-		var C_time_s *string
-		var C_time_e *string
-		var C_time_u *string
-
-		rows.Scan(&Payid, &D_id, &C_pay, &Can_pay, &Pay_by, &C_num, &C_c_num, &Pay_day, &C_pay_day, &C_conn, &C_time, &C_amount, &C_time_s, &C_time_e, &C_time_u)
-
-		m := structs.ChargeListItem{Payid: Payid, D_id: D_id, C_pay: C_pay, Can_pay: Can_pay, Pay_by: Pay_by, C_num: C_num, C_c_num: C_c_num, Pay_day: Pay_day, C_pay_day: C_pay_day, C_conn: C_conn, C_time: C_time, C_amount: C_amount, C_time_s: C_time_s, C_time_e: C_time_e, C_time_u: C_time_u}
-		result = append(result, m)
-	}
-	defer rows.Close()
-	defer conn.Close()
-
-	// log.Printf(" charge list : %s", result)
-
-	return result
-}
-
-// 일자별 충전량 조회
-func charge_daily_list_select() []structs.ChargeDailyListItem {
-	var result []structs.ChargeDailyListItem
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
-
-	// conn, err := sql.Open(dbname, dbdata)
-
-	conn, err := db.OpenDB()
-	if err != nil {
-		log.Printf(" User_survey_a err : %s", err)
-	}
-
-	rows, err := conn.Query("SELECT CAST(DATE_ADD(CAST(c.c_time_e as DATETIME),INTERVAL 9 HOUR) as DATE) as day, sum(CAST(c.c_amount as FLOAT)) as amount ,COUNT(c.c_amount) as count, sum(CAST(p.c_pay as UNSIGNED)-CAST(IFNULL(p.can_pay,0) as UNSIGNED)) as pay FROM charge_h as c RIGHT JOIN pay_h as p  ON c.c_id = p.pay_num GROUP BY day ORDER BY day")
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	for rows.Next() {
-		var Day string
-		var Amount *string
-		var Count *string
-		var Pay *string
-
-		rows.Scan(&Day, &Amount, &Count, &Pay)
-
-		m := structs.ChargeDailyListItem{Day: Day, Amount: Amount, Count: Count, Pay: Pay}
-		if Day != "" {
-			result = append(result, m)
-		}
-
-	}
-	defer rows.Close()
-	defer conn.Close()
-
-	// log.Printf(" charge list : %s", result)
-
-	return result
-}
-
-// 충전기 그래프 조회
-func charge_daily_graph_list_select() []structs.ChargeDailyGraphListItem {
-	var result []structs.ChargeDailyGraphListItem
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
-
-	// conn, err := sql.Open(dbname, dbdata)
-
-	conn, err := db.OpenDB()
-	if err != nil {
-		log.Printf(" User_survey_a err : %s", err)
-	}
-
-	rows, err := conn.Query("SELECT id FROM device")
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	for rows.Next() {
-		var Id string
-
-		rows.Scan(&Id)
-
-		m := structs.ChargeDailyGraphListItem{Id: Id}
-
-		result = append(result, m)
-
-	}
-	defer rows.Close()
-	defer conn.Close()
-
-	// log.Printf(" charge list : %s", result)
-
-	return result
-}
-
-// 충전기 그래프 조회
-func charge_daily_graph_select(starttime, endtime, device_id string) []structs.ChargeDailyGraphItem {
-	var result []structs.ChargeDailyGraphItem
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
-
-	// conn, err := sql.Open(dbname, dbdata)
-
-	conn, err := db.OpenDB()
-	if err != nil {
-		log.Printf(" User_survey_a err : %s", err)
-	}
-
-	//검색하는 기기 이름이 전체 or 개별
-	if device_id == "전체" {
-		rows, err := conn.Query("SELECT A.n AS time , ifnull(B.amount,0) AS amount, ifnull(B.count,0) AS count,ifnull(B.pay,0) AS pay  FROM (SELECT @N := @N +1 AS n FROM charge_h, (select @N:=-1 from DUAL ) NN LIMIT 24) AS A LEFT JOIN (SELECT Hour(DATE_ADD(CAST(c.c_time_e as DATETIME),INTERVAL 9 HOUR)) as hh, sum(CAST(c.c_amount as FLOAT)) as amount ,COUNT(c.c_amount) as count ,sum(CAST(p.c_pay as UNSIGNED)-CAST(IFNULL(p.can_pay,0) as UNSIGNED)) as pay FROM charge_h as c RIGHT JOIN pay_h as p  ON c.c_id = p.pay_num WHERE DATE_ADD(CAST(c.c_time_e as DATETIME),INTERVAL 9 HOUR) BETWEEN ? AND ? GROUP BY hh ORDER BY hh) AS B ON A.n = B.hh", starttime, endtime)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-
-		for rows.Next() {
-			var Time string
-			var Amount *string
-			var Count *string
-			var Pay *string
-
-			rows.Scan(&Time, &Amount, &Count, &Pay)
-
-			m := structs.ChargeDailyGraphItem{Time: Time, Amount: Amount, Count: Count, Pay: Pay}
-
-			result = append(result, m)
-
-		}
-		defer rows.Close()
-		defer conn.Close()
-
-		// log.Printf(" charge list : %s", result)
-
-		return result
-	} else {
-		rows, err := conn.Query("SELECT A.n AS time , ifnull(B.amount,0) AS amount, ifnull(B.count,0) AS count,ifnull(B.pay,0) AS pay  FROM (SELECT @N := @N +1 AS n FROM charge_h, (select @N:=-1 from DUAL ) NN LIMIT 24) AS A LEFT JOIN (SELECT Hour(DATE_ADD(CAST(c.c_time_e as DATETIME),INTERVAL 9 HOUR)) as hh, sum(CAST(c.c_amount as FLOAT)) as amount ,COUNT(c.c_amount) as count ,sum(CAST(p.c_pay as UNSIGNED)-CAST(IFNULL(p.can_pay,0) as UNSIGNED)) as pay FROM charge_h as c RIGHT JOIN pay_h as p  ON c.c_id = p.pay_num WHERE DATE_ADD(CAST(c.c_time_e as DATETIME),INTERVAL 9 HOUR) BETWEEN ? AND ? AND p.d_id = ?  GROUP BY hh ORDER BY hh) AS B ON A.n = B.hh", starttime, endtime, device_id)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-
-		for rows.Next() {
-			var Time string
-			var Amount *string
-			var Count *string
-			var Pay *string
-
-			rows.Scan(&Time, &Amount, &Count, &Pay)
-
-			m := structs.ChargeDailyGraphItem{Time: Time, Amount: Amount, Count: Count, Pay: Pay}
-
-			result = append(result, m)
-
-		}
-		defer rows.Close()
-		defer conn.Close()
-
-		// log.Printf(" charge list : %s", result)
-
-		return result
-	}
-
-}
-
-// 충전기 장애 이력
-func err_list_select() []structs.ErrListItem {
-	var result []structs.ErrListItem
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
-
-	// conn, err := sql.Open(dbname, dbdata)
-
-	conn, err := db.OpenDB()
-	if err != nil {
-		log.Printf(" User_survey_a err : %s", err)
-	}
-
-	rows, err := conn.Query("select * from device_err")
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	for rows.Next() {
-		var Id string
-		var D_Id string
-		var D_Error string
-		var V_Id string
-		var V_Error string
-		var E_Info string
-		var O_Time string
-
-		rows.Scan(&Id, &D_Id, &D_Error, &V_Id, &V_Error, &E_Info, &O_Time)
-
-		m := structs.ErrListItem{Id: Id, D_Id: D_Id, D_Error: D_Error, V_Id: V_Id, V_Error: V_Error, E_Info: E_Info, O_Time: O_Time}
-		result = append(result, m)
-	}
-	defer rows.Close()
-	defer conn.Close()
-
-	// log.Printf(" charge list : %s", result)
-
-	return result
-}
-
-// func LoginPage_Handler(w http.ResponseWriter, r *http.Request) {
-// 	templ.ExecuteTemplate(w, "loginpage", &structs.Page{Title: "LoginPage"})
-// }
-
 func Login_Handler(w http.ResponseWriter, r *http.Request) {
 
 	log.Print("Login_Handler")
@@ -670,34 +63,34 @@ func Login_Handler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.LoginPage{Items: Login_select(msg.Email, msg.PWD)})
+	json, _ := json.Marshal(&structs.LoginPage{Items: adminpagedbconn.Login_select(msg.Email, msg.PWD)})
 	w.Write(json)
 }
 
-// 대쉬보드 정보
-func Dashboard_Page_Handler(w http.ResponseWriter, r *http.Request, conn []string) {
+// // 대쉬보드 정보
+// func Dashboard_Page_Handler(w http.ResponseWriter, r *http.Request, conn []string) {
 
-	log.Print("Dashboard_Page_Handler")
+// 	log.Print("Dashboard_Page_Handler")
 
-	// 한국 시간대 로드
-	loc, err := time.LoadLocation("Asia/Seoul")
-	if err != nil {
-		fmt.Println("시간대 로딩 에러:", err)
-		return
-	}
+// 	// 한국 시간대 로드
+// 	loc, err := time.LoadLocation("Asia/Seoul")
+// 	if err != nil {
+// 		fmt.Println("시간대 로딩 에러:", err)
+// 		return
+// 	}
 
-	// 현재 시간을 한국 시간대로 설정
-	now := time.Now().In(loc)
+// 	// 현재 시간을 한국 시간대로 설정
+// 	now := time.Now().In(loc)
 
-	Device_Id := "전체"
-	StartTime := fmt.Sprintf("%s %s", now.AddDate(0, 0, -3).Format("2006-01-02"), "00:00:00")
-	EndTime := fmt.Sprintf("%s %s", now.Format("2006-01-02"), "23:59:59")
+// 	Device_Id := "전체"
+// 	StartTime := fmt.Sprintf("%s %s", now.AddDate(0, 0, -3).Format("2006-01-02"), "00:00:00")
+// 	EndTime := fmt.Sprintf("%s %s", now.Format("2006-01-02"), "23:59:59")
 
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.DashboardPage{List: device_list_select(), State: device_state_list_select(conn), Price: price_list_select(), Daily: charge_daily_list_select(), Maps: map_list_select(), Graph: charge_daily_graph_select(StartTime, EndTime, Device_Id)})
-	w.Write(json)
-}
+// 	w.WriteHeader(http.StatusOK)
+// 	w.Header().Set("Content-Type", "application/json")
+// 	json, _ := json.Marshal(&structs.DashboardPage{List: Device_list_select(), State: Device_state_list_select(conn), Price: price_list_select(), Daily: charge_daily_list_select(), Maps: map_list_select(), Graph: charge_daily_graph_select(StartTime, EndTime, Device_Id)})
+// 	w.Write(json)
+// }
 
 // 충전기 위치 정보
 func MapList_Page_Handler(w http.ResponseWriter, r *http.Request) {
@@ -706,73 +99,129 @@ func MapList_Page_Handler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.MapListPage{Items: map_list_select()})
+	json, _ := json.Marshal(&structs.MapListPage{Items: adminpagedbconn.Map_list_select()})
 	w.Write(json)
 }
 
 // 충전기 설치 정보
 func DeviceList_Page_Handler(w http.ResponseWriter, r *http.Request) {
 
-	log.Print("DeviceList_Page_Handler")
+	log.Printf("DeviceList_Page_Handler %v,%v", r.URL.Query().Get("s_order"), r.URL.Query().Get("e_order"))
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.DeviceListPage{Items: device_list_select()})
+	json, _ := json.Marshal(&structs.DeviceListPage{Count: adminpagedbconn.Device_list_count_select(), Items: adminpagedbconn.Device_list_select(r.URL.Query().Get("s_order"), r.URL.Query().Get("e_order"))})
 	w.Write(json)
 }
 
-// 충전기 상태 정보
-func DeviceStateList_Page_Handler(w http.ResponseWriter, r *http.Request, conn []string) {
+// 충전기 설치 정보 검색
+func DeviceList_Page_Search_Handler(w http.ResponseWriter, r *http.Request) {
 
-	log.Print("DeviceStateList_Page_Handler")
+	log.Printf("DeviceList_Page_Search_Handler %v,%v", r.URL.Query().Get("column"), r.URL.Query().Get("data"))
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.DeviceStateListPage{Items: device_state_list_select(conn)})
+	json, _ := json.Marshal(&structs.DeviceListPage{Items: adminpagedbconn.Device_list_select_search(r.URL.Query().Get("column"), r.URL.Query().Get("data"))})
 	w.Write(json)
 }
+
+// // 충전기 상태 정보
+// func DeviceStateList_Page_Handler(w http.ResponseWriter, r *http.Request, conn []string) {
+
+// 	log.Print("DeviceStateList_Page_Handler")
+
+// 	w.WriteHeader(http.StatusOK)
+// 	w.Header().Set("Content-Type", "application/json")
+// 	json, _ := json.Marshal(&structs.DeviceStateListPage{Items: Device_state_list_select(conn)})
+// 	w.Write(json)
+// }
 
 // 충전요금 단가 관리
 func Pricemng_Page_Handler(w http.ResponseWriter, r *http.Request) {
 
-	log.Print("Pricemng_Page_Handler")
+	log.Printf("Pricemng_Page_Handler %v,%v", r.URL.Query().Get("s_order"), r.URL.Query().Get("e_order"))
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.PricemngPage{Items: price_list_select()})
+	json, _ := json.Marshal(&structs.PricemngPage{Count: adminpagedbconn.Price_list_count_select(), Items: adminpagedbconn.Price_list_select(r.URL.Query().Get("s_order"), r.URL.Query().Get("e_order"))})
+	w.Write(json)
+}
+
+// 충전요금 단가 관리 검색
+func Pricemng_Page_Search_Handler(w http.ResponseWriter, r *http.Request) {
+
+	log.Printf("Pricemng_Page_Search_Handler %v,%v", r.URL.Query().Get("column"), r.URL.Query().Get("data"))
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json, _ := json.Marshal(&structs.PricemngPage{Items: adminpagedbconn.Price_list_select_search(r.URL.Query().Get("column"), r.URL.Query().Get("data"))})
 	w.Write(json)
 }
 
 // 충전기 업데이트 관리
 func Updatemng_Page_Handler(w http.ResponseWriter, r *http.Request) {
 
-	log.Print("Updatemng_Page_Handler")
+	log.Printf("Updatemng_Page_Handler %v,%v", r.URL.Query().Get("s_order"), r.URL.Query().Get("e_order"))
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.UpdatemngPage{Items: update_list_select()})
+	json, _ := json.Marshal(&structs.UpdatemngPage{Count: adminpagedbconn.Device_Update_list_count_select(), Items: adminpagedbconn.Update_list_select(r.URL.Query().Get("s_order"), r.URL.Query().Get("e_order"))})
+	w.Write(json)
+}
+
+// 충전기 업데이트 관리 검색
+func Updatemng_Page_Search_Handler(w http.ResponseWriter, r *http.Request) {
+
+	log.Printf("Updatemng_Page_Search_Handler %v,%v", r.URL.Query().Get("column"), r.URL.Query().Get("data"))
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json, _ := json.Marshal(&structs.UpdatemngPage{Items: adminpagedbconn.Update_list_select_search(r.URL.Query().Get("column"), r.URL.Query().Get("data"))})
 	w.Write(json)
 }
 
 // 충전기 로그 관리
 func Logmng_Page_Handler(w http.ResponseWriter, r *http.Request) {
 
-	log.Print("Logmng_Page_Handler")
+	log.Printf("Logmng_Page_Handler %v,%v", r.URL.Query().Get("s_order"), r.URL.Query().Get("e_order"))
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.LogmngPage{Items: Log_list_select()})
+	json, _ := json.Marshal(&structs.LogmngPage{Count: adminpagedbconn.Log_list_count_select(), Items: adminpagedbconn.Log_list_select(r.URL.Query().Get("s_order"), r.URL.Query().Get("e_order"))})
+	w.Write(json)
+}
+
+// 충전기 로그 관리 검색
+func Logmng_Page_Search_Handler(w http.ResponseWriter, r *http.Request) {
+
+	log.Printf("Logmng_Page_Search_Handler %v,%v", r.URL.Query().Get("column"), r.URL.Query().Get("data"))
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json, _ := json.Marshal(&structs.LogmngPage{Items: adminpagedbconn.Log_list_select_search(r.URL.Query().Get("column"), r.URL.Query().Get("data"))})
 	w.Write(json)
 }
 
 // 충전량 및 이력조회
 func Chargelist_Page_Handler(w http.ResponseWriter, r *http.Request) {
 
-	log.Print("Chargelist_Page_Handler")
+	log.Printf("Chargelist_Page_Handler %v,%v", r.URL.Query().Get("s_order"), r.URL.Query().Get("e_order"))
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.ChargeListPage{Items: charge_list_select()})
+	json, _ := json.Marshal(&structs.ChargeListPage{Count: adminpagedbconn.Charge_list_count_select(), Items: adminpagedbconn.Charge_list_select(r.URL.Query().Get("s_order"), r.URL.Query().Get("e_order"))})
+	w.Write(json)
+
+}
+
+// 충전량 및 이력조회 검색
+func Chargelist_Page_Search_Handler(w http.ResponseWriter, r *http.Request) {
+
+	log.Printf("Chargelist_Page_Search_Handler %v,%v", r.URL.Query().Get("column"), r.URL.Query().Get("data"))
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json, _ := json.Marshal(&structs.ChargeListPage{Items: adminpagedbconn.Charge_list_select_search(r.URL.Query().Get("column"), r.URL.Query().Get("data"))})
 	w.Write(json)
 
 }
@@ -780,11 +229,22 @@ func Chargelist_Page_Handler(w http.ResponseWriter, r *http.Request) {
 // 일자별 충전량 조회
 func ChargeDailylist_Page_Handler(w http.ResponseWriter, r *http.Request) {
 
-	log.Print("ChargeDailylist_Page_Handler")
+	log.Printf("ChargeDailylist_Page_Handler %v,%v", r.URL.Query().Get("s_order"), r.URL.Query().Get("e_order"))
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.ChargeDailyListPage{Items: charge_daily_list_select()})
+	json, _ := json.Marshal(&structs.ChargeDailyListPage{Count: adminpagedbconn.Charge_daily_list_count_select(), Items: adminpagedbconn.Charge_daily_list_select(r.URL.Query().Get("s_order"), r.URL.Query().Get("e_order"))})
+	w.Write(json)
+}
+
+// 일자별 충전량 검색
+func ChargeDailylist_Page_Search_Handler(w http.ResponseWriter, r *http.Request) {
+
+	log.Printf("ChargeDailylist_Page_Search_Handler %v,%v", r.URL.Query().Get("column"), r.URL.Query().Get("data"))
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json, _ := json.Marshal(&structs.ChargeDailyListPage{Items: adminpagedbconn.Charge_daily_list_select_search(r.URL.Query().Get("column"), r.URL.Query().Get("data"))})
 	w.Write(json)
 }
 
@@ -804,20 +264,31 @@ func ChargeDailyGraph_Page_Handler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.ChargeDailyGraphPage{ListItem: charge_daily_graph_list_select(), Items: charge_daily_graph_select(msg.StartTime, msg.EndTime, msg.DeviceID)})
+	json, _ := json.Marshal(&structs.ChargeDailyGraphPage{ListItem: adminpagedbconn.Charge_daily_graph_list_select(), Items: adminpagedbconn.Charge_daily_graph_select(msg.StartTime, msg.EndTime, msg.DeviceID)})
 	w.Write(json)
 }
 
 // 충전기 장애 이력
 func Errlist_Page_Handler(w http.ResponseWriter, r *http.Request) {
 
-	log.Print("Errlist_Page_Handler")
+	log.Printf("Errlist_Page_Handler %v,%v", r.URL.Query().Get("s_order"), r.URL.Query().Get("e_order"))
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.ErrListPage{Items: err_list_select()})
+	json, _ := json.Marshal(&structs.ErrListPage{Count: adminpagedbconn.Err_list_count_select(), Items: adminpagedbconn.Err_list_select(r.URL.Query().Get("s_order"), r.URL.Query().Get("e_order"))})
 	w.Write(json)
 
+}
+
+// 충전기 장애 이력 검색
+func Errlist_Page_Search_Handler(w http.ResponseWriter, r *http.Request) {
+
+	log.Printf("Errlist_Page_Search_Handler %v,%v", r.URL.Query().Get("column"), r.URL.Query().Get("data"))
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json, _ := json.Marshal(&structs.ErrListPage{Items: adminpagedbconn.Err_list_select_search(r.URL.Query().Get("column"), r.URL.Query().Get("data"))})
+	w.Write(json)
 }
 
 // // 소프트웨어 업데이트 관리
@@ -829,7 +300,7 @@ func Errlist_Page_Handler(w http.ResponseWriter, r *http.Request) {
 
 // 충전기별 광고 관리
 func Admng_Page_Handler(w http.ResponseWriter, r *http.Request) {
-	templ.ExecuteTemplate(w, "main_menu", &structs.AdmngPage{Title: "충전기별 광고 관리", Page: 3, Items: ad_list_select()})
+	templ.ExecuteTemplate(w, "main_menu", &structs.AdmngPage{Title: "충전기별 광고 관리", Page: 3, Items: adminpagedbconn.Ad_list_select()})
 }
 
 //매출실적 및 정산 조회
@@ -837,150 +308,6 @@ func Admng_Page_Handler(w http.ResponseWriter, r *http.Request) {
 //공통코드
 
 ///////////////////////////////////////////////////////////			// 기능 핸들러
-
-// 기기 등록
-func insert_device(Id string, Latitude string, Longitude string, Addr string, S_Version string, H_C_M string, H_P_M string, H_B_M string, H_W_M string, Enabled string) bool {
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
-
-	// conn, err := sql.Open(dbname, dbdata)
-
-	conn, err := db.OpenDB()
-	if err != nil {
-		fmt.Println(err)
-		return false
-	}
-
-	rows, err := conn.Query("INSERT INTO device(id,latitude,longitude,addr,s_version,h_c_m,h_p_m,h_b_m,h_w_m,enabled) VALUES(?,?,?,?,?,?,?,?,?,?)", Id, Latitude, Longitude, Addr, S_Version, H_C_M, H_P_M, H_B_M, H_W_M, Enabled)
-	if err != nil {
-		fmt.Printf("rows1 : %s", err)
-		return false
-	}
-
-	//상태 등록
-	rows2, err := conn.Query("INSERT INTO device_status(id) VALUES(?)", Id)
-	if err != nil {
-		fmt.Printf("rows2 : %s", err)
-		return false
-	}
-
-	log.Printf("insert_device : %v , %v ", rows, rows2)
-
-	defer conn.Close()
-
-	return true
-}
-
-// 기기 수정
-func update_device(Id string, Latitude string, Longitude string, Addr string, S_Version string, H_C_M string, H_P_M string, H_B_M string, H_W_M string, Enabled string) bool {
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
-
-	// conn, err := sql.Open(dbname, dbdata)
-
-	conn, err := db.OpenDB()
-	if err != nil {
-		fmt.Println(err)
-		return false
-	}
-
-	rows, err := conn.Query("UPDATE device SET id =? , latitude =? , longitude =? , addr =? , s_version =? , h_c_m =? , h_p_m =? , h_b_m =? , h_w_m =? , enabled =? WHERE id = ?", Id, Latitude, Longitude, Addr, S_Version, H_C_M, H_P_M, H_B_M, H_W_M, Enabled, Id)
-	if err != nil {
-		fmt.Printf("rows1 : %s", err)
-		return false
-	}
-
-	log.Printf("update_device : %v", rows)
-
-	defer conn.Close()
-
-	return true
-}
-
-// 기기 삭제
-func delete_device(Id string, Latitude string, Longitude string) bool {
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
-
-	// conn, err := sql.Open(dbname, dbdata)
-
-	conn, err := db.OpenDB()
-	if err != nil {
-		fmt.Println(err)
-		return false
-	}
-
-	rows, err := conn.Query("DELETE FROM device WHERE id =? AND latitude =? AND longitude =?", Id, Latitude, Longitude)
-	if err != nil {
-		fmt.Printf("rows1 : %s", err)
-		return false
-	}
-
-	//상태 삭제
-	rows2, err := conn.Query("DELETE FROM device_status WHERE id =?", Id)
-	if err != nil {
-		fmt.Printf("rows2 : %s", err)
-		return false
-	}
-
-	log.Printf("delete_device : %v , %v ", rows, rows2)
-
-	defer conn.Close()
-
-	return true
-}
-
-// 단가 등록
-func insert_price(price string, writer string) bool {
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
-
-	// conn, err := sql.Open(dbname, dbdata)
-
-	conn, err := db.OpenDB()
-	if err != nil {
-		fmt.Println(err)
-		return false
-	}
-
-	rows, err := conn.Query("INSERT INTO e_price(price,writer) VALUES(?,?)", price, writer)
-	if err != nil {
-		fmt.Printf("rows1 : %s", err)
-		return false
-	}
-
-	log.Printf("insert_price : %v ", rows)
-
-	defer conn.Close()
-
-	return true
-}
-
-// 단가 삭제
-func delete_price(Id string, writer string) bool {
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
-
-	// conn, err := sql.Open(dbname, dbdata)
-
-	conn, err := db.OpenDB()
-	if err != nil {
-		fmt.Println(err)
-		return false
-	}
-
-	rows, err := conn.Query("DELETE FROM e_price WHERE id =? AND writer =?", Id, writer)
-	if err != nil {
-		fmt.Printf("rows1 : %s", err)
-		return false
-	}
-
-	log.Printf("delete_price : %v", rows)
-
-	defer conn.Close()
-
-	return true
-}
 
 // 기기 등록
 func Register_Device_Handler(w http.ResponseWriter, r *http.Request) {
@@ -998,7 +325,7 @@ func Register_Device_Handler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.DeviceIUDDataForm{Items: insert_device(msg.Id, msg.Latitude, msg.Longitude, msg.Addr, msg.S_Version, msg.H_C_M, msg.H_P_M, msg.H_B_M, msg.H_W_M, msg.Enabled)})
+	json, _ := json.Marshal(&structs.DeviceIUDDataForm{Items: adminpagedbconn.Insert_device(msg.Id, msg.Latitude, msg.Longitude, msg.Addr, msg.S_Version, msg.H_C_M, msg.H_P_M, msg.H_B_M, msg.H_W_M, msg.Enabled)})
 	w.Write(json)
 
 }
@@ -1019,7 +346,7 @@ func Updater_Device_Handler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.DeviceIUDDataForm{Items: update_device(msg.Id, msg.Latitude, msg.Longitude, msg.Addr, msg.S_Version, msg.H_C_M, msg.H_P_M, msg.H_B_M, msg.H_W_M, msg.Enabled)})
+	json, _ := json.Marshal(&structs.DeviceIUDDataForm{Items: adminpagedbconn.Update_device(msg.Id, msg.Latitude, msg.Longitude, msg.Addr, msg.S_Version, msg.H_C_M, msg.H_P_M, msg.H_B_M, msg.H_W_M, msg.Enabled)})
 	w.Write(json)
 }
 
@@ -1039,7 +366,7 @@ func Deleter_Device_Handler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.DeviceIUDDataForm{Items: delete_device(msg.Id, msg.Latitude, msg.Longitude)})
+	json, _ := json.Marshal(&structs.DeviceIUDDataForm{Items: adminpagedbconn.Delete_device(msg.Id, msg.Latitude, msg.Longitude)})
 	w.Write(json)
 }
 
@@ -1059,7 +386,7 @@ func Register_Price_Handler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.DeviceIUDDataForm{Items: insert_price(msg.Price, msg.Writer)})
+	json, _ := json.Marshal(&structs.DeviceIUDDataForm{Items: adminpagedbconn.Insert_price(msg.Price, msg.Writer)})
 	w.Write(json)
 
 }
@@ -1080,7 +407,7 @@ func Deleter_Price_Handler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.DeviceIUDDataForm{Items: delete_price(msg.Id, msg.Writer)})
+	json, _ := json.Marshal(&structs.DeviceIUDDataForm{Items: adminpagedbconn.Delete_price(msg.Id, msg.Writer)})
 	w.Write(json)
 }
 
