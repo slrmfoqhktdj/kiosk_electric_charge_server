@@ -39,17 +39,19 @@ func Login_select(email string, pwd string) structs.LoginDataForm {
 		log.Printf(" Login_select db err : %s", err)
 	}
 
-	if err := conn.QueryRow("SELECT email,name,password FROM admin_user WHERE email = ?", email).Scan(&Email, &Name, &Password); err != nil {
-		log.Printf("select user, %v", err)
-		return result
-	}
-
-	// 암호화
+	// // 암호화
 	// hashedPassword, err := bcrypt.GenerateFromPassword([]byte(pwd), 11) // 10 means difficulty
 	// if err != nil {
 	// 	log.Printf("failed to GenerateFromPassword: %v", err)
 	// 	return result
 	// }
+
+	// log.Printf("password : %v", string(hashedPassword))
+
+	if err := conn.QueryRow("SELECT email,name,password FROM admin_user WHERE email = ?", email).Scan(&Email, &Name, &Password); err != nil {
+		log.Printf("select user, %v", err)
+		return result
+	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(Password), []byte(pwd)); err != nil {
 		log.Printf("incorrect password, %v", err)
@@ -132,7 +134,8 @@ func Device_list_select(s_order, e_order string) []structs.DeviceListItem {
 		var Latitude string
 		var Longitude string
 		var Addr string
-		var S_Version string
+		var Model *string
+		var S_Version *string
 		var H_C_M string
 		var H_P_M string
 		var H_B_M string
@@ -141,9 +144,9 @@ func Device_list_select(s_order, e_order string) []structs.DeviceListItem {
 		var U_Time string
 		var Enabled string
 
-		rows.Scan(&Id, &Latitude, &Longitude, &Addr, &S_Version, &H_C_M, &H_P_M, &H_B_M, &H_W_M, &I_Time, &U_Time, &Enabled)
+		rows.Scan(&Id, &Latitude, &Longitude, &Addr, &Model, &S_Version, &H_C_M, &H_P_M, &H_B_M, &H_W_M, &I_Time, &U_Time, &Enabled)
 
-		m := structs.DeviceListItem{Id: Id, Latitude: Latitude, Longitude: Longitude, Addr: Addr, S_Version: S_Version, H_C_M: H_C_M, H_P_M: H_P_M, H_B_M: H_B_M, H_W_M: H_W_M, I_Time: I_Time, U_Time: U_Time, Enabled: Enabled}
+		m := structs.DeviceListItem{Id: Id, Latitude: Latitude, Longitude: Longitude, Addr: Addr, Model: Model, S_Version: S_Version, H_C_M: H_C_M, H_P_M: H_P_M, H_B_M: H_B_M, H_W_M: H_W_M, I_Time: I_Time, U_Time: U_Time, Enabled: Enabled}
 		result = append(result, m)
 	}
 	defer rows.Close()
@@ -247,7 +250,7 @@ func Update_list_select(s_order, e_order string) []structs.DeviceUpdateListItem 
 		log.Printf("update_list_select err : %s", err)
 	}
 
-	rows, err := conn.Query("SELECT d.id, d.addr,d.s_version,s.f_state,d.i_time,d.u_time  FROM device AS d LEFT JOIN device_status AS s ON s.id = d.id ORDER BY s.u_time DESC limit ?,?", s_order, e_order)
+	rows, err := conn.Query("SELECT d.id, d.addr,d.model,d.s_version,s.f_state,d.i_time,d.u_time  FROM device AS d LEFT JOIN device_status AS s ON s.id = d.id ORDER BY s.u_time DESC limit ?,?", s_order, e_order)
 	if err != nil {
 		log.Printf("update_list_select err : %s", err)
 	}
@@ -255,14 +258,15 @@ func Update_list_select(s_order, e_order string) []structs.DeviceUpdateListItem 
 	for rows.Next() {
 		var Id string
 		var Addr string
-		var S_Version string
+		var Model *string
+		var S_Version *string
 		var F_State *string
 		var I_Time string
 		var U_Time string
 
-		rows.Scan(&Id, &Addr, &S_Version, &F_State, &I_Time, &U_Time)
+		rows.Scan(&Id, &Addr, &Model, &S_Version, &F_State, &I_Time, &U_Time)
 
-		m := structs.DeviceUpdateListItem{Id: Id, Addr: Addr, S_Version: S_Version, F_State: F_State, I_Time: I_Time, U_Time: U_Time}
+		m := structs.DeviceUpdateListItem{Id: Id, Addr: Addr, Model: Model, S_Version: S_Version, F_State: F_State, I_Time: I_Time, U_Time: U_Time}
 		result = append(result, m)
 	}
 	defer rows.Close()
@@ -387,7 +391,7 @@ func Charge_list_select(s_order, e_order string) []structs.ChargeListItem {
 		log.Printf("charge_list_select err : %s", err)
 	}
 
-	rows, err := conn.Query("SELECT p.pay_num as payid, d_id,c_pay,can_pay,pay_by,c_num,c_c_num,pay_day,c_pay_day,c_conn,c_time,c_amount,c_time_s,c_time_e,c_time_u FROM charge_h as c RIGHT JOIN pay_h as p  ON c.c_id = p.pay_num ORDER BY c_time_s DESC limit ?,?", s_order, e_order)
+	rows, err := conn.Query("SELECT p.pay_num as payid, d_id,c_pay,can_pay,pay_by,c_num,c_c_num,pay_day,c_pay_day,c_conn,c_time,c_amount,c_time_s,c_time_e,c_time_u,c_reason FROM charge_h as c RIGHT JOIN pay_h as p  ON c.c_id = p.pay_num ORDER BY c_time_s DESC limit ?,?", s_order, e_order)
 	if err != nil {
 		log.Printf("charge_list_select err : %s", err)
 	}
@@ -408,10 +412,11 @@ func Charge_list_select(s_order, e_order string) []structs.ChargeListItem {
 		var C_time_s *string
 		var C_time_e *string
 		var C_time_u *string
+		var C_reason *string
 
-		rows.Scan(&Payid, &D_id, &C_pay, &Can_pay, &Pay_by, &C_num, &C_c_num, &Pay_day, &C_pay_day, &C_conn, &C_time, &C_amount, &C_time_s, &C_time_e, &C_time_u)
+		rows.Scan(&Payid, &D_id, &C_pay, &Can_pay, &Pay_by, &C_num, &C_c_num, &Pay_day, &C_pay_day, &C_conn, &C_time, &C_amount, &C_time_s, &C_time_e, &C_time_u, &C_reason)
 
-		m := structs.ChargeListItem{Payid: Payid, D_id: D_id, C_pay: C_pay, Can_pay: Can_pay, Pay_by: Pay_by, C_num: C_num, C_c_num: C_c_num, Pay_day: Pay_day, C_pay_day: C_pay_day, C_conn: C_conn, C_time: C_time, C_amount: C_amount, C_time_s: C_time_s, C_time_e: C_time_e, C_time_u: C_time_u}
+		m := structs.ChargeListItem{Payid: Payid, D_id: D_id, C_pay: C_pay, Can_pay: Can_pay, Pay_by: Pay_by, C_num: C_num, C_c_num: C_c_num, Pay_day: Pay_day, C_pay_day: C_pay_day, C_conn: C_conn, C_time: C_time, C_amount: C_amount, C_time_s: C_time_s, C_time_e: C_time_e, C_time_u: C_time_u, C_reason: C_reason}
 		result = append(result, m)
 	}
 	defer rows.Close()
@@ -768,7 +773,7 @@ func Err_list_count_select() int {
 ///////////////////////////////////////////////////////////			// 기능 핸들러
 
 // 기기 등록
-func Insert_device(Id string, Latitude string, Longitude string, Addr string, S_Version string, H_C_M string, H_P_M string, H_B_M string, H_W_M string, Enabled string) bool {
+func Insert_device(Id, Latitude, Longitude, Addr, Model, S_Version, H_C_M, H_P_M, H_B_M, H_W_M, Enabled string) bool {
 	// dbname := os.Getenv("DBNAME")
 	// dbdata := os.Getenv("DBDATA")
 
@@ -780,14 +785,14 @@ func Insert_device(Id string, Latitude string, Longitude string, Addr string, S_
 		return false
 	}
 
-	rows, err := conn.Query("INSERT INTO device(id,latitude,longitude,addr,s_version,h_c_m,h_p_m,h_b_m,h_w_m,enabled) VALUES(?,?,?,?,?,?,?,?,?,?)", Id, Latitude, Longitude, Addr, S_Version, H_C_M, H_P_M, H_B_M, H_W_M, Enabled)
+	rows, err := conn.Exec("INSERT INTO device(id,latitude,longitude,addr,model,s_version,h_c_m,h_p_m,h_b_m,h_w_m,enabled) VALUES(?,?,?,?,?,?,?,?,?,?,?)", Id, Latitude, Longitude, Addr, Model, S_Version, H_C_M, H_P_M, H_B_M, H_W_M, Enabled)
 	if err != nil {
 		fmt.Printf("rows1 : %s", err)
 		return false
 	}
 
 	//상태 등록
-	rows2, err := conn.Query("INSERT INTO device_status(id) VALUES(?)", Id)
+	rows2, err := conn.Exec("INSERT INTO device_status(id) VALUES(?)", Id)
 	if err != nil {
 		fmt.Printf("rows2 : %s", err)
 		return false
@@ -801,7 +806,7 @@ func Insert_device(Id string, Latitude string, Longitude string, Addr string, S_
 }
 
 // 기기 수정
-func Update_device(Id string, Latitude string, Longitude string, Addr string, S_Version string, H_C_M string, H_P_M string, H_B_M string, H_W_M string, Enabled string) bool {
+func Update_device(Id, Latitude, Longitude, Addr, Model, S_Version, H_C_M, H_P_M, H_B_M, H_W_M, Enabled string) bool {
 	// dbname := os.Getenv("DBNAME")
 	// dbdata := os.Getenv("DBDATA")
 
@@ -813,7 +818,7 @@ func Update_device(Id string, Latitude string, Longitude string, Addr string, S_
 		return false
 	}
 
-	rows, err := conn.Query("UPDATE device SET id =? , latitude =? , longitude =? , addr =? , s_version =? , h_c_m =? , h_p_m =? , h_b_m =? , h_w_m =? , enabled =? WHERE id = ?", Id, Latitude, Longitude, Addr, S_Version, H_C_M, H_P_M, H_B_M, H_W_M, Enabled, Id)
+	rows, err := conn.Exec("UPDATE device SET id =? , latitude =? , longitude =? , addr =? , model = ?,s_version =? , h_c_m =? , h_p_m =? , h_b_m =? , h_w_m =? , enabled =? WHERE id = ?", Id, Latitude, Longitude, Addr, Model, S_Version, H_C_M, H_P_M, H_B_M, H_W_M, Enabled, Id)
 	if err != nil {
 		fmt.Printf("rows1 : %s", err)
 		return false
@@ -839,14 +844,14 @@ func Delete_device(Id string, Latitude string, Longitude string) bool {
 		return false
 	}
 
-	rows, err := conn.Query("DELETE FROM device WHERE id =? AND latitude =? AND longitude =?", Id, Latitude, Longitude)
+	rows, err := conn.Exec("DELETE FROM device WHERE id =? AND latitude =? AND longitude =?", Id, Latitude, Longitude)
 	if err != nil {
 		fmt.Printf("rows1 : %s", err)
 		return false
 	}
 
 	//상태 삭제
-	rows2, err := conn.Query("DELETE FROM device_status WHERE id =?", Id)
+	rows2, err := conn.Exec("DELETE FROM device_status WHERE id =?", Id)
 	if err != nil {
 		fmt.Printf("rows2 : %s", err)
 		return false
@@ -872,7 +877,7 @@ func Insert_price(price string, writer string) bool {
 		return false
 	}
 
-	rows, err := conn.Query("INSERT INTO e_price(price,writer) VALUES(?,?)", price, writer)
+	rows, err := conn.Exec("INSERT INTO e_price(price,writer) VALUES(?,?)", price, writer)
 	if err != nil {
 		fmt.Printf("rows1 : %s", err)
 		return false
@@ -898,14 +903,13 @@ func Delete_price(Id string, writer string) bool {
 		return false
 	}
 
-	rows, err := conn.Query("DELETE FROM e_price WHERE id =? AND writer =?", Id, writer)
+	rows, err := conn.Exec("DELETE FROM e_price WHERE id =? AND writer =?", Id, writer)
 	if err != nil {
 		fmt.Printf("rows1 : %s", err)
 		return false
 	}
 
 	log.Printf("delete_price : %v", rows)
-
 	defer conn.Close()
 
 	return true
@@ -928,6 +932,7 @@ func Device_list_select_search(column, data string) []structs.DeviceListItem {
 		"latitude":  true,
 		"longitude": true,
 		"addr":      true,
+		"model":     true,
 		"s_version": true,
 		"h_c_m":     true,
 		"h_p_m":     true,
@@ -954,7 +959,8 @@ func Device_list_select_search(column, data string) []structs.DeviceListItem {
 		var Latitude string
 		var Longitude string
 		var Addr string
-		var S_Version string
+		var Model *string
+		var S_Version *string
 		var H_C_M string
 		var H_P_M string
 		var H_B_M string
@@ -963,9 +969,9 @@ func Device_list_select_search(column, data string) []structs.DeviceListItem {
 		var U_Time string
 		var Enabled string
 
-		rows.Scan(&Id, &Latitude, &Longitude, &Addr, &S_Version, &H_C_M, &H_P_M, &H_B_M, &H_W_M, &I_Time, &U_Time, &Enabled)
+		rows.Scan(&Id, &Latitude, &Longitude, &Addr, &Model, &S_Version, &H_C_M, &H_P_M, &H_B_M, &H_W_M, &I_Time, &U_Time, &Enabled)
 
-		m := structs.DeviceListItem{Id: Id, Latitude: Latitude, Longitude: Longitude, Addr: Addr, S_Version: S_Version, H_C_M: H_C_M, H_P_M: H_P_M, H_B_M: H_B_M, H_W_M: H_W_M, I_Time: I_Time, U_Time: U_Time, Enabled: Enabled}
+		m := structs.DeviceListItem{Id: Id, Latitude: Latitude, Longitude: Longitude, Addr: Addr, Model: Model, S_Version: S_Version, H_C_M: H_C_M, H_P_M: H_P_M, H_B_M: H_B_M, H_W_M: H_W_M, I_Time: I_Time, U_Time: U_Time, Enabled: Enabled}
 		result = append(result, m)
 	}
 	defer rows.Close()
@@ -1232,7 +1238,7 @@ func Update_list_select_search(column, data string) []structs.DeviceUpdateListIt
 		}
 	}
 
-	queryStirng := fmt.Sprintf("SELECT d.id, d.addr,d.s_version,s.f_state,d.i_time,d.u_time  FROM device AS d LEFT JOIN device_status AS s ON s.id = d.id  where %s like ? ORDER BY s.u_time DESC", column)
+	queryStirng := fmt.Sprintf("SELECT d.id, d.addr,d.model,d.s_version,s.f_state,d.i_time,d.u_time  FROM device AS d LEFT JOIN device_status AS s ON s.id = d.id  where %s like ? ORDER BY s.u_time DESC", column)
 
 	rows, err := conn.Query(queryStirng, "%"+strings.Trim(data, " ")+"%")
 	if err != nil {
@@ -1242,14 +1248,15 @@ func Update_list_select_search(column, data string) []structs.DeviceUpdateListIt
 	for rows.Next() {
 		var Id string
 		var Addr string
-		var S_Version string
+		var Model *string
+		var S_Version *string
 		var F_State *string
 		var I_Time string
 		var U_Time string
 
-		rows.Scan(&Id, &Addr, &S_Version, &F_State, &I_Time, &U_Time)
+		rows.Scan(&Id, &Addr, &Model, &S_Version, &F_State, &I_Time, &U_Time)
 
-		m := structs.DeviceUpdateListItem{Id: Id, Addr: Addr, S_Version: S_Version, F_State: F_State, I_Time: I_Time, U_Time: U_Time}
+		m := structs.DeviceUpdateListItem{Id: Id, Addr: Addr, Model: Model, S_Version: S_Version, F_State: F_State, I_Time: I_Time, U_Time: U_Time}
 		result = append(result, m)
 	}
 	defer rows.Close()

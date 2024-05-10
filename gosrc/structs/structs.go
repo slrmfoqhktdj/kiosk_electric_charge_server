@@ -139,18 +139,19 @@ type MapListItem struct { // 충전기 위치정보 구조체
 }
 
 type DeviceListItem struct { // 충전기 설치정보 구조체
-	Id        string `json:"id"`
-	Latitude  string `json:"latitude"`
-	Longitude string `json:"longitude"`
-	Addr      string `json:"addr"`
-	S_Version string `json:"s_version"`
-	H_C_M     string `json:"h_c_m"`
-	H_P_M     string `json:"h_p_m"`
-	H_B_M     string `json:"h_b_m"`
-	H_W_M     string `json:"h_w_m"`
-	I_Time    string `json:"i_time"`
-	U_Time    string `json:"u_time"`
-	Enabled   string `json:"enabled"`
+	Id        string  `json:"id"`
+	Latitude  string  `json:"latitude"`
+	Longitude string  `json:"longitude"`
+	Addr      string  `json:"addr"`
+	Model     *string `json:"model"`
+	S_Version *string `json:"s_version"`
+	H_C_M     string  `json:"h_c_m"`
+	H_P_M     string  `json:"h_p_m"`
+	H_B_M     string  `json:"h_b_m"`
+	H_W_M     string  `json:"h_w_m"`
+	I_Time    string  `json:"i_time"`
+	U_Time    string  `json:"u_time"`
+	Enabled   string  `json:"enabled"`
 }
 
 type DeviceStateListItem struct { // 충전기 상태정보 구조체
@@ -176,7 +177,8 @@ type PriceListItem struct { // 충전요금 단가 관리 구조체
 type DeviceUpdateListItem struct {
 	Id        string  `json:"id"`
 	Addr      string  `json:"addr"`
-	S_Version string  `json:"s_version"`
+	Model     *string `json:"model"`
+	S_Version *string `json:"s_version"`
 	F_State   *string `json:"f_state"`
 	I_Time    string  `json:"i_time"`
 	U_Time    string  `json:"u_time"`
@@ -204,6 +206,7 @@ type ChargeListItem struct { // 충전량 및 이력조회 관리 구조체
 	C_time_s  *string `json:"c_time_s"`
 	C_time_e  *string `json:"c_time_e"`
 	C_time_u  *string `json:"c_time_u"`
+	C_reason  *string `json:"c_reason"`
 }
 
 type ChargeDailyListItem struct { // 일자별 충전량 조회 구조체

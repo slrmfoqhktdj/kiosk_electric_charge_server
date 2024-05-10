@@ -10,7 +10,7 @@ import (
 )
 
 // 기기 부팅
-func BootNotification_db_handler(device_name string, device_sw_v string) string {
+func BootNotification_db_handler(device_name, device_sw_v, device_model string) string {
 	// dbname := os.Getenv("DBNAME")
 	// dbdata := os.Getenv("DBDATA")
 
@@ -30,7 +30,7 @@ func BootNotification_db_handler(device_name string, device_sw_v string) string 
 		return "2"
 	}
 
-	rows, err := conn.Query("UPDATE device SET s_version = ? WHERE id = ?", device_sw_v, device_name)
+	rows, err := conn.Exec("UPDATE device SET model = ? , s_version = ? WHERE id = ?", device_model, device_sw_v, device_name)
 	if err != nil {
 		fmt.Printf("rows1 : %s", err)
 		return "2"
@@ -102,7 +102,7 @@ func DataTransfer_set_pay(device_id string, charge_Pay string, pay_By string, cr
 		return false
 	}
 
-	rows, err := conn.Query("INSERT INTO pay_h(pay_num,d_id,c_pay,pay_by,c_num,pay_day) VALUES(?,?,?,?,?,?)", pay_num, device_id, charge_Pay, pay_By, credit_num, pay_day)
+	rows, err := conn.Exec("INSERT INTO pay_h(pay_num,d_id,c_pay,pay_by,c_num,pay_day) VALUES(?,?,?,?,?,?)", pay_num, device_id, charge_Pay, pay_By, credit_num, pay_day)
 	if err != nil {
 		fmt.Printf("rows1 : %s", err)
 		return false
@@ -128,7 +128,7 @@ func DataTransfer_update_pay(can_pay string, c_pay_day string, c_c_num string, p
 		return false
 	}
 
-	rows, err := conn.Query("UPDATE pay_h SET can_pay = ? , c_pay_day = ? , c_c_num = ? WHERE pay_num = ?", can_pay, c_pay_day, c_c_num, pay_num)
+	rows, err := conn.Exec("UPDATE pay_h SET can_pay = ? , c_pay_day = ? , c_c_num = ? WHERE pay_num = ?", can_pay, c_pay_day, c_c_num, pay_num)
 	if err != nil {
 		fmt.Printf("rows1 : %s", err)
 		return false
@@ -184,7 +184,7 @@ func StartTransaction_set_start(c_id string, c_conn int, c_amount float32, Times
 		return false
 	}
 
-	rows, err := conn.Query("INSERT INTO charge_h(c_id,c_conn,c_amount,c_time_s) VALUES(?,?,?,?)", c_id, c_conn, c_amount, Timestamp)
+	rows, err := conn.Exec("INSERT INTO charge_h(c_id,c_conn,c_amount,c_time_s) VALUES(?,?,?,?)", c_id, c_conn, c_amount, Timestamp)
 	if err != nil {
 		fmt.Printf("rows1 : %s", err)
 		return false
@@ -198,7 +198,7 @@ func StartTransaction_set_start(c_id string, c_conn int, c_amount float32, Times
 }
 
 // 충전정보 update
-func StopTransaction_update_end(id string, c_time_e string, c_amount float32) bool {
+func StopTransaction_update_end(id string, c_time_e string, c_amount float32, reason string) bool {
 
 	// dbname := os.Getenv("DBNAME")
 	// dbdata := os.Getenv("DBDATA")
@@ -211,13 +211,15 @@ func StopTransaction_update_end(id string, c_time_e string, c_amount float32) bo
 		return false
 	}
 
-	rows, err := conn.Query("UPDATE charge_h SET c_amount = ? ,c_time_e = ? WHERE c_id = ?", c_amount, c_time_e, id)
+	log.Printf("id = %s", id)
+
+	rows, err := conn.Exec("UPDATE charge_h SET c_amount = ? ,c_time_e = ? , c_reason = ? WHERE c_id = ?", c_amount, c_time_e, reason, id)
 	if err != nil {
 		fmt.Printf("rows1 : %s", err)
 		return false
 	}
 
-	log.Printf("StopTransaction_update_end : %v", rows)
+	log.Printf("StopTransaction_update_end : %v , %s", rows, reason)
 
 	defer conn.Close()
 
@@ -238,18 +240,19 @@ func StatusNotification_update(id string, ConnectorId int, errcode string, statu
 	}
 
 	if vendorid > "" {
-		rows, err := conn.Query("UPDATE device_status SET state = ? , state_e = ?, v_id = ?, v_error = ? , e_info = ? , u_time = ? WHERE id = ?", status, errcode, vendorid, vendorerrorcode, info, timestemp, id)
+		rows, err := conn.Exec("UPDATE device_status SET state = ? , state_e = ?, v_id = ?, v_error = ? , e_info = ? , u_time = ? WHERE id = ?", status, errcode, vendorid, vendorerrorcode, info, timestemp, id)
 		if err != nil {
 			fmt.Printf("rows1 : %s", err)
 		}
 		log.Printf("StatusNotification_update vendor false : %v", rows)
 
 	} else {
-		rows, err := conn.Query("UPDATE device_status SET state = ? , state_e = ?, e_info = ? , u_time = ?  WHERE id = ?", status, errcode, info, timestemp, id)
+		rows, err := conn.Exec("UPDATE device_status SET state = ? , state_e = ?, e_info = ? , u_time = ?  WHERE id = ?", status, errcode, info, timestemp, id)
 		if err != nil {
 			fmt.Printf("rows1 : %s", err)
 		}
 		log.Printf("StatusNotification_update vendor true : %v", rows)
+
 	}
 
 	defer conn.Close()
@@ -257,7 +260,7 @@ func StatusNotification_update(id string, ConnectorId int, errcode string, statu
 }
 
 // 충전량 update
-func Metervalue_update(c_id string, t_id int, time string, value string) {
+func Metervalue_update(tid string, c_id int, time string, value string) {
 
 	// dbname := os.Getenv("DBNAME")
 	// dbdata := os.Getenv("DBDATA")
@@ -269,7 +272,7 @@ func Metervalue_update(c_id string, t_id int, time string, value string) {
 		fmt.Println(err)
 	}
 
-	rows, err := conn.Query("UPDATE charge_h SET c_time_u = ?, c_amount = ? WHERE c_id = ? and c_conn = ?", time, value, c_id, t_id)
+	rows, err := conn.Exec("UPDATE charge_h SET c_time_u = ?, c_amount = ? WHERE c_id = ? and c_conn = ?", time, value, tid, c_id)
 	if err != nil {
 		fmt.Printf("rows1 : %s", err)
 	}
@@ -292,12 +295,11 @@ func DiagnosticsStatusNotification_update(id string, DiagnosticsStatus string) {
 		fmt.Println(err)
 	}
 
-	rows, err := conn.Query("UPDATE device_status SET d_state = ? WHERE id = ?", DiagnosticsStatus, id)
+	rows, err := conn.Exec("UPDATE device_status SET d_state = ? WHERE id = ?", DiagnosticsStatus, id)
 	if err != nil {
 		fmt.Printf("rows1 : %s", err)
 	}
 	log.Printf("DiagnosticsStatusNotification_update : %v", rows)
-
 	defer conn.Close()
 
 }
@@ -315,7 +317,7 @@ func FirmwareStatusNotification_update(id string, firmwareStatus string) {
 		fmt.Println(err)
 	}
 
-	rows, err := conn.Query("UPDATE device_status SET f_state = ? WHERE id = ?", firmwareStatus, id)
+	rows, err := conn.Exec("UPDATE device_status SET f_state = ? WHERE id = ?", firmwareStatus, id)
 	if err != nil {
 		fmt.Printf("rows1 : %s", err)
 	}
@@ -340,7 +342,7 @@ func Device_Error_insert(d_id string, d_error string, v_id string, v_error strin
 		fmt.Println(err)
 	}
 
-	rows, err := conn.Query("INSERT INTO device_err(d_id,d_error,v_id,v_error,e_info) VALUES(?,?,?,?,?)", d_id, d_error, v_id, v_error, e_info)
+	rows, err := conn.Exec("INSERT INTO device_err(d_id,d_error,v_id,v_error,e_info) VALUES(?,?,?,?,?)", d_id, d_error, v_id, v_error, e_info)
 	if err != nil {
 		fmt.Printf("Device_Error rows1 : %s", err)
 

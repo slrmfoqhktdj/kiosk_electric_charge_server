@@ -325,7 +325,7 @@ func Register_Device_Handler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.DeviceIUDDataForm{Items: adminpagedbconn.Insert_device(msg.Id, msg.Latitude, msg.Longitude, msg.Addr, msg.S_Version, msg.H_C_M, msg.H_P_M, msg.H_B_M, msg.H_W_M, msg.Enabled)})
+	json, _ := json.Marshal(&structs.DeviceIUDDataForm{Items: adminpagedbconn.Insert_device(msg.Id, msg.Latitude, msg.Longitude, msg.Addr, *msg.Model, *msg.S_Version, msg.H_C_M, msg.H_P_M, msg.H_B_M, msg.H_W_M, msg.Enabled)})
 	w.Write(json)
 
 }
@@ -346,7 +346,7 @@ func Updater_Device_Handler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.DeviceIUDDataForm{Items: adminpagedbconn.Update_device(msg.Id, msg.Latitude, msg.Longitude, msg.Addr, msg.S_Version, msg.H_C_M, msg.H_P_M, msg.H_B_M, msg.H_W_M, msg.Enabled)})
+	json, _ := json.Marshal(&structs.DeviceIUDDataForm{Items: adminpagedbconn.Update_device(msg.Id, msg.Latitude, msg.Longitude, msg.Addr, *msg.Model, *msg.S_Version, msg.H_C_M, msg.H_P_M, msg.H_B_M, msg.H_W_M, msg.Enabled)})
 	w.Write(json)
 }
 

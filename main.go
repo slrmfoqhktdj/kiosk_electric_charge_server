@@ -401,7 +401,7 @@ func Dashboard_Page_Handler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	json, _ := json.Marshal(&structs.DashboardPage{List: adminpagedbconn.Device_list_select("0", "3"), State: adminpagedbconn.Device_state_list_select(ConnectedDeivceList_Handler(), "0", "3"), Price: adminpagedbconn.Price_list_select("0", "3"), Daily: adminpagedbconn.Charge_daily_list_select("0", "4"), Maps: adminpagedbconn.Map_list_select(), Graph: adminpagedbconn.Charge_daily_graph_select(StartTime, EndTime, Device_Id)})
+	json, _ := json.Marshal(&structs.DashboardPage{List: adminpagedbconn.Device_list_select("0", "3"), State: adminpagedbconn.Device_state_list_select(ConnectedDeivceList_Handler(), "0", "3"), Price: adminpagedbconn.Price_list_select("0", "3"), Daily: adminpagedbconn.Charge_daily_list_select("0", "3"), Maps: adminpagedbconn.Map_list_select(), Graph: adminpagedbconn.Charge_daily_graph_select(StartTime, EndTime, Device_Id)})
 	w.Write(json)
 }
 
@@ -935,7 +935,7 @@ func BootNotificationHandler(cp *ChargePoint, p Payload) Payload {
 	// cp2, b := csms.Load("device_01")
 	// log.Printf("cp2 : %s, b : %v", cp2.Id, (b))
 
-	rb := ocpp_db_handler.BootNotification_db_handler(req.ChargePointModel, req.FirmwareVersion)
+	rb := ocpp_db_handler.BootNotification_db_handler(req.ChargePointSerialNumber, req.FirmwareVersion, req.ChargePointModel)
 
 	var res Payload
 
@@ -1058,9 +1058,7 @@ func StopTransactionHandler(cp *ChargePoint, p Payload) Payload {
 	// v16.MeterValue
 	// v16.SampledValue
 
-	// reason 가지고 기록을 해야하나 - 오류나 멈춤 기록에 넣어야 할듯
-
-	rb := ocpp_db_handler.StopTransaction_update_end(strconv.Itoa(req.TransactionId), req.Timestamp, float32(req.MeterStop)/1000.0)
+	rb := ocpp_db_handler.StopTransaction_update_end(strconv.Itoa(req.TransactionId), req.Timestamp, float32(req.MeterStop)/1000.0, req.Reason)
 
 	var res Payload
 
@@ -1213,6 +1211,8 @@ func MeterValuesHandler(cp *ChargePoint, p Payload) Payload {
 
 	if len(strconv.Itoa(req.TransactionId)) < 8 {
 		TID = fmt.Sprintf("%08d", req.TransactionId)
+	} else {
+		TID = strconv.Itoa(req.TransactionId)
 	}
 
 	ocpp_db_handler.Metervalue_update(TID, req.ConnectorId, req.MeterValue[0].Timestamp, req.MeterValue[0].SampledValue[0].Value)
