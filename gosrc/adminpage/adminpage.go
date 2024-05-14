@@ -2,51 +2,52 @@ package adminpage
 
 import (
 	"encoding/json"
-	"fmt"
+	// "fmt"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
+
+	// "os"
+	// "path/filepath"
+	// "strings"
 
 	// "time"
 
 	// _ "github.com/go-sql-driver/mysql"
 
-	"text/template"
+	// "text/template"
 
 	"kiosk_electoric_charge/gosrc/adminpagedbconn"
 	"kiosk_electoric_charge/gosrc/structs"
 )
 
-// // html 구획 나누기
-var templ = func() *template.Template {
+// // // html 구획 나누기
+// var templ = func() *template.Template {
 
-	//template 에 function 넣기
-	funcadd := template.FuncMap{
-		"add": func(a int, b int) int {
-			return a + b
-		},
-	}
+// 	//template 에 function 넣기
+// 	funcadd := template.FuncMap{
+// 		"add": func(a int, b int) int {
+// 			return a + b
+// 		},
+// 	}
 
-	// t := template.New("")
-	t := template.New("").Funcs(funcadd)
-	err := filepath.Walk("./", func(path string, info os.FileInfo, err error) error {
-		if strings.Contains(path, ".html") {
-			fmt.Println(path)
-			_, err = t.ParseFiles(path)
-			if err != nil {
-				fmt.Println(err)
-			}
-		}
-		return err
-	})
+// 	// t := template.New("")
+// 	t := template.New("").Funcs(funcadd)
+// 	err := filepath.Walk("./", func(path string, info os.FileInfo, err error) error {
+// 		if strings.Contains(path, ".html") {
+// 			fmt.Println(path)
+// 			_, err = t.ParseFiles(path)
+// 			if err != nil {
+// 				fmt.Println(err)
+// 			}
+// 		}
+// 		return err
+// 	})
 
-	if err != nil {
-		fmt.Print(err)
-	}
-	return t
-}()
+// 	if err != nil {
+// 		fmt.Print(err)
+// 	}
+// 	return t
+// }()
 
 func Login_Handler(w http.ResponseWriter, r *http.Request) {
 
@@ -298,10 +299,10 @@ func Errlist_Page_Search_Handler(w http.ResponseWriter, r *http.Request) {
 
 //광고물 관리
 
-// 충전기별 광고 관리
-func Admng_Page_Handler(w http.ResponseWriter, r *http.Request) {
-	templ.ExecuteTemplate(w, "main_menu", &structs.AdmngPage{Title: "충전기별 광고 관리", Page: 3, Items: adminpagedbconn.Ad_list_select()})
-}
+// // 충전기별 광고 관리
+// func Admng_Page_Handler(w http.ResponseWriter, r *http.Request) {
+// 	templ.ExecuteTemplate(w, "main_menu", &structs.AdmngPage{Title: "충전기별 광고 관리", Page: 3, Items: adminpagedbconn.Ad_list_select()})
+// }
 
 //매출실적 및 정산 조회
 //사용자 관리 권한

@@ -237,6 +237,14 @@ func Command_Handler(w http.ResponseWriter, r *http.Request) {
 			// log.Print(res)
 
 			////////////////UnlockConnector
+			var req Payload = v16.UnlockConnectorReq{
+				ConnectorId: 1,
+			}
+			res, err := cp.Call("UnlockConnector", req)
+			if err != nil {
+				log.Printf("aa %s", err)
+			}
+			log.Print(res)
 
 			////////////////GetConfiguration
 			//- 없으면 모든 설정 반환
@@ -300,18 +308,18 @@ func Command_Handler(w http.ResponseWriter, r *http.Request) {
 			////////////////GetDiagnostics	// 진단 파일 가져오기 (로그 등등)
 			// startTime이 없으면 최근/stoptime 기준 3일전까지의 데이터
 			// stoptime이 없으면 최근까지의 데이터
-			var req Payload = v16.GetDiagnosticsReq{
-				Location:      string("file/log/operation"), // 두개짜리
-				Retries:       2,
-				RetryInterval: 10,
-				StartTime:     "2024-03-03T15:04:05.999Z",
-				StopTime:      "2024-03-06T15:04:05.999Z",
-			}
-			res, err := cp.Call("GetDiagnostics", req)
-			if err != nil {
-				log.Printf("aa %s", err)
-			}
-			log.Print(res) // 리턴값 파일명. 없으면 오류가 났거나 해당 조건에 맞는 진단이 없어 업로드 안함
+			// var req Payload = v16.GetDiagnosticsReq{
+			// 	Location:      string("file/log/operation"), // 두개짜리
+			// 	Retries:       2,
+			// 	RetryInterval: 10,
+			// 	StartTime:     "2024-03-03T15:04:05.999Z",
+			// 	StopTime:      "2024-03-06T15:04:05.999Z",
+			// }
+			// res, err := cp.Call("GetDiagnostics", req)
+			// if err != nil {
+			// 	log.Printf("aa %s", err)
+			// }
+			// log.Print(res) // 리턴값 파일명. 없으면 오류가 났거나 해당 조건에 맞는 진단이 없어 업로드 안함
 
 			////////////////UpdateFirmware
 			// var req Payload = v16.UpdateFirmwareReq{
@@ -556,7 +564,7 @@ func main() {
 	// mux.Path("/swmng").HandlerFunc(adminpage.Swmng_Page_Handler)
 	//광고물 관리
 	//충전기별 광고 관리
-	privateRouter.Path("/admng").HandlerFunc(adminpage.Admng_Page_Handler)
+	// privateRouter.Path("/admng").HandlerFunc(adminpage.Admng_Page_Handler)
 
 	//매출실적 및 정산 조회
 	//사용자 관리/권한
@@ -671,6 +679,7 @@ func main() {
 	privateRouter.Path("/command/cgab").HandlerFunc(ChangeAvailability_Handler).Methods("POST")
 
 	//커넥터 해체
+	privateRouter.Path("/command/ulcn").HandlerFunc(UnlockConnector_Handler).Methods("POST")
 
 	//리셋
 	privateRouter.Path("/command/rs").HandlerFunc(Reset_Handler).Methods("POST")
@@ -770,7 +779,7 @@ func main() {
 	// // RemoteStartTransaction - 원격 시작 트랜잭션(54p)
 	// // RemoteStopTransaction - 원격 중지 트랜잭션(54p) -
 	// // Reset	- 초기화 (57p)	- 진행중이면 stoptransaction 보내야함 -> 응용프로그램 or 하드웨어 다시 시작
-	// // UnlockConnector	- 커넥터 잠금 해제(61p)	- 커넥터 케이블 고정장치가 오작동 하는 경우 분리
+	// // UnlockConnector	- 커넥터 잠금 해제(61p)	- 커넥터 케이블 고정장치가 오작동 하는 경우 분리 ,때로는 전기차가 충전기에 연결된 상태에서 커넥터가 자동으로 잠기기 때문에, 사용자가 차량을 떼어내기 위해서는 이 잠금을 해제해야 할 수도 있습니다.  Unlock Connector 명령은 다음과 같은 상황에서 사용될 수 있습니다: 충전 세션이 정상적으로 종료된 후 사용자가 차량을 충전소에서 분리하려 할 때 커넥터가 여전히 잠겨 있는 경우. 충전 과정 중 오류나 문제가 발생하여 충전 세션이 비정상적으로 종료되었을 때. 충전기나 차량의 통신 문제로 인해 자동 잠금 해제가 작동하지 않을 때.
 	// // DataTransfer	--- 커스텀 정보값
 
 	// // FIRMWARE MANAGEMENT
@@ -1486,7 +1495,50 @@ func ChangeAvailability_Handler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(returnValue)
 }
 
-//커넥터 해체
+// 커넥터 해체
+func UnlockConnector_Handler(w http.ResponseWriter, r *http.Request) {
+
+	id := r.Header.Get("Id")
+	msg := v16.UnlockConnectorReq{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&msg)
+	if err != nil {
+		log.Printf("UnlockConnector_Handler err : %s", err)
+		return
+	}
+	defer r.Body.Close()
+
+	log.Printf("UnlockConnector_Handler msg : %v", msg)
+	var returnValue *v16.UnlockConnectorConf
+
+	if csms != nil {
+		cp, b := csms.Load(id)
+		if b {
+
+			////////////////UnlockConnector - 62p NotSupported = 해당 커넥터 id 없음. Unlocked = 해제됨, UnlockFailed= 해제실패
+			var req Payload = v16.UnlockConnectorReq{
+				ConnectorId: msg.ConnectorId,
+			}
+			res, err := cp.Call("UnlockConnector", req)
+			if err != nil {
+				log.Printf("aa %s", err)
+			}
+			log.Print(res)
+
+			returnValue = res.(*v16.UnlockConnectorConf)
+
+		}
+
+		if cp == nil {
+			log.Print("cp is nil")
+			returnValue = &v16.UnlockConnectorConf{}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(returnValue)
+}
 
 // 리셋
 func Reset_Handler(w http.ResponseWriter, r *http.Request) {

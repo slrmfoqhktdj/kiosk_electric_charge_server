@@ -345,38 +345,38 @@ func Log_list_select(s_order, e_order string) []structs.DeviceLogListItem {
 // }
 
 // 충전기별 광고 관리
-func Ad_list_select() []structs.AdListItem {
-	var result []structs.AdListItem
-	// dbname := os.Getenv("DBNAME")
-	// dbdata := os.Getenv("DBDATA")
+// func Ad_list_select() []structs.AdListItem {
+// 	var result []structs.AdListItem
+// 	// dbname := os.Getenv("DBNAME")
+// 	// dbdata := os.Getenv("DBDATA")
 
-	// conn, err := sql.Open(dbname, dbdata)
+// 	// conn, err := sql.Open(dbname, dbdata)
 
-	conn, err := db.OpenDB()
-	if err != nil {
-		log.Printf("ad_list_select err : %s", err)
-	}
+// 	conn, err := db.OpenDB()
+// 	if err != nil {
+// 		log.Printf("ad_list_select err : %s", err)
+// 	}
 
-	rows, err := conn.Query("select d_id,ad_id,time from device_ad")
-	if err != nil {
-		log.Printf("ad_list_select err : %s", err)
-	}
+// 	rows, err := conn.Query("select d_id,ad_id,time from device_ad")
+// 	if err != nil {
+// 		log.Printf("ad_list_select err : %s", err)
+// 	}
 
-	for rows.Next() {
-		var D_Id string
-		var AD_Id string
-		var Time string
+// 	for rows.Next() {
+// 		var D_Id string
+// 		var AD_Id string
+// 		var Time string
 
-		rows.Scan(&D_Id, &AD_Id, &Time)
+// 		rows.Scan(&D_Id, &AD_Id, &Time)
 
-		m := structs.AdListItem{D_Id: D_Id, AD_Id: AD_Id, Time: Time}
-		result = append(result, m)
-	}
-	defer rows.Close()
-	defer conn.Close()
+// 		m := structs.AdListItem{D_Id: D_Id, AD_Id: AD_Id, Time: Time}
+// 		result = append(result, m)
+// 	}
+// 	defer rows.Close()
+// 	defer conn.Close()
 
-	return result
-}
+// 	return result
+// }
 
 // 충전량 및 이력조회
 func Charge_list_select(s_order, e_order string) []structs.ChargeListItem {
