@@ -42,12 +42,5 @@
  키오스크 앱 --REST--> 결제 이력/충전 시작·종료/APK 업데이트
 
 
-<img width="2992" height="2992" alt="KakaoTalk_20250417_163948276_04" src="https://github.com/user-attachments/assets/dc649e78-5abb-441f-87e9-3b29e17c5c87" />
-
-
-<img width="2992" height="2992" alt="KakaoTalk_20250417_163948276_02" src="https://github.com/user-attachments/assets/1af46489-74e9-4762-8904-6264f6773840" />
-
-
-
  <img width="991" height="1244" alt="전기차 충전기 DB 다이어그램" src="https://github.com/user-attachments/assets/12fdb484-d7b3-4784-ad68-d8d2f6ea041f" />
 
